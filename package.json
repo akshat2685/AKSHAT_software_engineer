@@ -1,0 +1,12 @@
+{
+  "name": "akshat-software-engineer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "py src/akshat_fastapi.py",
+    "start:legacy": "py src/akshat_local.py",
+    "build": "py -m compileall -q src backend",
+    "test": "node --test"
+  }
+}
