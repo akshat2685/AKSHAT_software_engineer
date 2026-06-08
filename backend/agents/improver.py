@@ -10,7 +10,7 @@ class ImproverAgent(EngineeringAgent):
     role = "improver"
 
     def determine_next_action(self, state: Any, objective: str) -> str:
-        return "Analyze failed tests and prepare corrective retry"
+        return "Analyze failed validation output and prepare the smallest corrective retry"
 
     def update_state(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
         failure = state.test_results.get("stderr") or state.test_results.get("summary") or "Validation failed"

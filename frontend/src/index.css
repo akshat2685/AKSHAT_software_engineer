@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --accent-color: #38d5ff; /* Default Cyan */
+  }
+
+  body {
+    @apply m-0 min-h-screen overflow-x-hidden bg-bg text-gray-200 font-body select-none;
+    background: radial-gradient(circle at 18% 18%, rgba(56, 213, 255, 0.12), transparent 26%),
+                radial-gradient(circle at 82% 22%, rgba(76, 242, 161, 0.08), transparent 24%),
+                radial-gradient(circle at 50% 84%, rgba(255, 209, 102, 0.05), transparent 30%),
+                #03050b;
+  }
+
+  /* Custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Glassmorphism Panel styles */
+.glass-panel {
+  @apply relative overflow-hidden rounded-xl border border-line bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-md;
+}
+
+.glass-panel::before {
+  content: "";
+  @apply absolute inset-0 pointer-events-none opacity-70 bg-gradient-to-br from-white/10 via-transparent to-white/5;
+}
+
+/* Neural Network Background Canvas */
+#neural-canvas {
+  @apply fixed inset-0 w-full h-full pointer-events-none;
+  z-index: -1;
+}
+
+/* Pulse keyframes for status updates */
+@keyframes status-pulse {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.status-pulse {
+  animation: status-pulse 1.8s ease-in-out infinite;
+}

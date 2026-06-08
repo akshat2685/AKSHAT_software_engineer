@@ -13,9 +13,21 @@ function AgentWorkflow({ workflow }) {
     h("div", { className: "label", key: "label" }, "Agent Workflow"),
     h("div", { className: "workflow-strip", key: "stats" }, [
       h(Stat, { label: "Current Agent", value: workflow?.current_agent || "Idle", key: "agent" }),
+      h(Stat, { label: "Task Type", value: workflow?.task_type || "general", key: "task" }),
       h(Stat, { label: "Iterations", value: workflow?.iteration_count || 0, key: "iteration" }),
       h(Stat, { label: "Quality", value: workflow?.quality_score || 0, key: "quality" }),
       h(Stat, { label: "Security", value: workflow?.security_score || 0, key: "security" }),
+    ]),
+    h("div", { className: "agent-grid", key: "deployment" }, [
+      h("div", { className: "agent-card", key: "deployment-card" }, [
+        h("strong", { key: "title" }, "Deployment"),
+        h("div", { key: "url" }, workflow?.deployment_url || "No deployment yet."),
+        h("small", { key: "status" }, workflow?.deployment_status || "pending"),
+      ]),
+      h("div", { className: "agent-card", key: "order-card" }, [
+        h("strong", { key: "title" }, "Execution Order"),
+        h("div", { key: "order" }, (workflow?.execution_order || []).join(" -> ") || "Waiting for task."),
+      ]),
     ]),
     h("div", { className: "agent-grid", key: "events" }, events.length ? events.map((event, index) =>
       h("div", { className: "agent-card", key: index }, [

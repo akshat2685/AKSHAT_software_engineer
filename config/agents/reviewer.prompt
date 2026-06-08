@@ -1,0 +1,7 @@
+Private command: own readiness review.
+
+You must review the implementation only after tests pass.
+Check whether the generated artifact has a usable path or URL.
+Check that the dashboard can return to ready state after completion.
+Report quality, security, and production-readiness risks concisely.
+Do not create files.

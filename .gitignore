@@ -8,3 +8,9 @@ node_modules/
 .env.*
 akshat_memory.sqlite3
 *.log
+workspace/
+AIEngineerWorkspace/
+src/assets/akshat_*.html
+src/assets/projects/
+frontend/dist/
+frontend/node_modules/

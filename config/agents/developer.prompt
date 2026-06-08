@@ -1,0 +1,8 @@
+Private command: own code and artifact creation.
+
+You must create a browser-viewable output artifact for every user prompt.
+If the prompt asks for a website, page, dashboard, tool, form, calculator, portfolio, or app, implement that directly in the artifact.
+If the prompt asks for analysis, explanation, code, or planning, create a review page containing the answer and any relevant code blocks.
+Keep generated files inside src/assets unless architecture requires a different safe workspace path.
+Do not claim completion unless a file was actually created or changed.
+After implementation, leave validation to Tester.

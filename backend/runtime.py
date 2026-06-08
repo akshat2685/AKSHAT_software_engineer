@@ -47,6 +47,10 @@ class TaskState:
     status: str = "idle"
     avatar_state: str = "Idle"
     current_action: str = "Waiting for task"
+    task_type: str = "general"
+    prompt_analysis: Dict[str, Any] = field(default_factory=dict)
+    selected_agents: List[str] = field(default_factory=list)
+    execution_order: List[str] = field(default_factory=list)
     plan: List[str] = field(default_factory=list)
     todo_list: List[str] = field(default_factory=list)
     steps_done: List[str] = field(default_factory=list)
@@ -55,12 +59,29 @@ class TaskState:
     quality_score: int = 0
     security_score: int = 0
     iteration_count: int = 0
+    build_results: Dict[str, Any] = field(default_factory=dict)
+    artifact_url: str = ""
+    artifact_output_url: str = ""
+    artifact_path: str = ""
+    artifact_name: str = ""
+    artifact_version: str = ""
+    project_path: str = ""
+    entry_file: str = ""
+    entry_url: str = ""
+    created_files: List[str] = field(default_factory=list)
+    deployment_url: str = ""
+    deployment_status: str = "pending"
+    artifact_history: List[Dict[str, Any]] = field(default_factory=list)
     final_deliverable: str = ""
+    final_result: str = ""
+    structured_result: Dict[str, Any] = field(default_factory=dict)
+    execution_trace: List[Dict[str, Any]] = field(default_factory=list)
     chat: List[Dict[str, str]] = field(default_factory=list)
     tests: Dict[str, Any] = field(default_factory=lambda: {"passed": 0, "failed": 0, "summary": "Not run"})
     browser: Dict[str, Any] = field(default_factory=lambda: {"url": "", "screenshot": "", "notes": ""})
     repo: Dict[str, Any] = field(default_factory=dict)
     git: Dict[str, Any] = field(default_factory=dict)
+    agent_context: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     memory_hits: List[str] = field(default_factory=list)
     habits: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
@@ -95,108 +116,119 @@ class EventBus:
 
 class MemoryStore:
     def __init__(self, path: Path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        self.lock = threading.Lock()
-        self._init_schema()
-
-    def _init_schema(self) -> None:
-        with self.lock:
-            self.conn.execute(
-                "CREATE TABLE IF NOT EXISTS memories(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, kind TEXT NOT NULL, prompt TEXT NOT NULL, summary TEXT NOT NULL, payload TEXT NOT NULL)"
-            )
-            self.conn.execute(
-                "CREATE TABLE IF NOT EXISTS habits(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, kind TEXT NOT NULL, pattern TEXT NOT NULL, confidence REAL NOT NULL, evidence TEXT NOT NULL)"
-            )
-            self.conn.execute(
-                "CREATE TABLE IF NOT EXISTS tool_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, agent_name TEXT NOT NULL, tool_name TEXT NOT NULL, reason TEXT NOT NULL, parameters TEXT NOT NULL, result TEXT NOT NULL)"
-            )
-            self.conn.commit()
+        from backend.database.connection import init_db, SessionLocal
+        init_db()
+        self.SessionLocal = SessionLocal
 
     def add(self, kind: str, prompt: str, summary: str, payload: Dict[str, Any]) -> None:
-        with self.lock:
-            self.conn.execute(
-                "INSERT INTO memories(created_at, kind, prompt, summary, payload) VALUES (?,?,?,?,?)",
-                (now_iso(), kind, prompt, summary, json.dumps(payload)),
-            )
-            self.conn.commit()
+        from backend.database.models import Memory
+        db = self.SessionLocal()
+        try:
+            outcome = payload.get("outcome", "")
+            if not outcome and isinstance(payload, dict):
+                outcome = json.dumps(payload)
+            entry = Memory(problem=prompt, solution=summary, outcome=outcome, tags=kind)
+            db.add(entry)
+            db.commit()
+        finally:
+            db.close()
 
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
-        return self._memory_rows(
-            "WHERE lower(prompt) LIKE ? OR lower(summary) LIKE ?",
-            (f"%{query.lower()}%", f"%{query.lower()}%", limit),
-            limit,
-        )
+        from backend.database.models import Memory
+        db = self.SessionLocal()
+        try:
+            q = f"%{query.lower()}%"
+            rows = db.query(Memory).filter(
+                (Memory.problem.ilike(q)) | (Memory.solution.ilike(q)) | (Memory.outcome.ilike(q))
+            ).order_by(Memory.id.desc()).limit(limit).all()
+            return [
+                {
+                    "created_at": row.created_at.isoformat(),
+                    "kind": row.tags,
+                    "prompt": row.problem,
+                    "summary": row.solution,
+                    "payload": {"outcome": row.outcome},
+                }
+                for row in rows
+            ]
+        finally:
+            db.close()
 
     def recent(self, limit: int = 20) -> List[Dict[str, Any]]:
-        return self._memory_rows("", (limit,), limit)
-
-    def _memory_rows(self, where: str, params: tuple[Any, ...], limit: int) -> List[Dict[str, Any]]:
-        sql = (
-            "SELECT created_at, kind, prompt, summary, length(payload) AS payload_size, "
-            f"substr(payload, 1, 300) AS payload_preview FROM memories {where} ORDER BY id DESC LIMIT ?"
-        )
-        with self.lock:
-            rows = self.conn.execute(sql, params).fetchall()
-        return [
-            {
-                "created_at": row["created_at"],
-                "kind": row["kind"],
-                "prompt": row["prompt"],
-                "summary": row["summary"],
-                "payload": {"preview": row["payload_preview"], "size": row["payload_size"], "truncated": True},
-            }
-            for row in rows
-        ]
+        from backend.database.models import Memory
+        db = self.SessionLocal()
+        try:
+            rows = db.query(Memory).order_by(Memory.id.desc()).limit(limit).all()
+            return [
+                {
+                    "created_at": row.created_at.isoformat(),
+                    "kind": row.tags,
+                    "prompt": row.problem,
+                    "summary": row.solution,
+                    "payload": {"outcome": row.outcome},
+                }
+                for row in rows
+            ]
+        finally:
+            db.close()
 
     def add_habit(self, kind: str, pattern: str, confidence: float, evidence: Dict[str, Any]) -> None:
-        with self.lock:
-            self.conn.execute(
-                "INSERT INTO habits(created_at, kind, pattern, confidence, evidence) VALUES (?,?,?,?,?)",
-                (now_iso(), kind, pattern, confidence, json.dumps(evidence)),
-            )
-            self.conn.commit()
+        # Habits are mapped to Memory with tags="habit"
+        self.add("habit", pattern, f"Confidence: {confidence}", {"kind": kind, "evidence": evidence})
 
     def recent_habits(self, limit: int = 20) -> List[Dict[str, Any]]:
-        with self.lock:
-            rows = self.conn.execute(
-                "SELECT created_at, kind, pattern, confidence, length(evidence) AS evidence_size, substr(evidence, 1, 300) AS evidence_preview FROM habits ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-        return [
-            {
-                "created_at": row["created_at"],
-                "kind": row["kind"],
-                "pattern": row["pattern"],
-                "confidence": row["confidence"],
-                "evidence": {"preview": row["evidence_preview"], "size": row["evidence_size"], "truncated": True},
-            }
-            for row in rows
-        ]
+        from backend.database.models import Memory
+        db = self.SessionLocal()
+        try:
+            rows = db.query(Memory).filter(Memory.tags == "habit").order_by(Memory.id.desc()).limit(limit).all()
+            return [
+                {
+                    "created_at": row.created_at.isoformat(),
+                    "kind": "habit",
+                    "pattern": row.problem,
+                    "confidence": 0.9, # fallback
+                    "evidence": {"outcome": row.outcome},
+                }
+                for row in rows
+            ]
+        finally:
+            db.close()
 
     def add_tool_log(self, agent_name: str, tool_name: str, reason: str, parameters: Dict[str, Any], result: Dict[str, Any]) -> None:
-        with self.lock:
-            self.conn.execute(
-                "INSERT INTO tool_logs(created_at, agent_name, tool_name, reason, parameters, result) VALUES (?,?,?,?,?,?)",
-                (now_iso(), agent_name, tool_name, reason, json.dumps(parameters), json.dumps(result)),
+        from backend.database.models import AgentRun
+        db = self.SessionLocal()
+        try:
+            # Look up or mock active project ID
+            project_id = parameters.get("project_id", "idle")
+            run = AgentRun(
+                project_id=project_id,
+                agent=agent_name,
+                action=f"{tool_name}: {reason}",
+                result=json.dumps(result)
             )
-            self.conn.commit()
+            run.set_payload(parameters)
+            db.add(run)
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
 
     def recent_tool_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
-        with self.lock:
-            rows = self.conn.execute(
-                "SELECT created_at, agent_name, tool_name, reason, parameters, result FROM tool_logs ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-        return [
-            {
-                "created_at": row["created_at"],
-                "agent_name": row["agent_name"],
-                "tool_name": row["tool_name"],
-                "reason": row["reason"],
-                "parameters": json_preview(row["parameters"], 2000),
-                "result": json_preview(row["result"], 1000),
-            }
-            for row in rows
-        ]
+        from backend.database.models import AgentRun
+        db = self.SessionLocal()
+        try:
+            rows = db.query(AgentRun).order_by(AgentRun.id.desc()).limit(limit).all()
+            return [
+                {
+                    "created_at": row.created_at.isoformat(),
+                    "agent_name": row.agent,
+                    "tool_name": row.action.split(":")[0] if ":" in row.action else row.action,
+                    "reason": row.action.split(":", 1)[1].strip() if ":" in row.action else "",
+                    "parameters": json_preview(row.payload, 2000),
+                    "result": json_preview(row.result, 1000),
+                }
+                for row in rows
+            ]
+        finally:
+            db.close()

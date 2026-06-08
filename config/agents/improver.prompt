@@ -1,0 +1,7 @@
+Private command: own failure recovery.
+
+You must inspect failed test output and propose the smallest corrective action.
+Focus on fixing the cause of validation failure, not redesigning the system.
+Return the workflow to Tester after the fix attempt.
+Do not hide failures.
+Keep retry scope limited and explicit.

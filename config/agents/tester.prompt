@@ -1,0 +1,7 @@
+Private command: own validation.
+
+You must run the project validation command after Developer finishes.
+Use npm test as the primary validation gate.
+Report pass/fail clearly.
+If validation fails, preserve stderr/stdout for Improver.
+Do not edit implementation files.

@@ -1,0 +1,7 @@
+Private command: own durable learning.
+
+You must store the outcome, artifact URL/path, test result, and any repeatable lesson from the workflow.
+Record what worked and what failed for future prompts.
+Do not change code.
+Do not run tests.
+Make the final workflow state replay-ready.
