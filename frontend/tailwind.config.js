@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#03050b',
-        'bg-2': '#07111c',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        'hero-sub': 'hsl(var(--hero-sub))',
         panel: 'rgba(8, 13, 25, 0.68)',
         glass: 'rgba(255, 255, 255, 0.075)',
         line: 'rgba(255, 255, 255, 0.14)',
@@ -19,12 +20,19 @@ export default {
         violet: '#a78bfa',
       },
       fontFamily: {
-        display: ["Bahnschrift", "Segoe UI Variable Display", "sans-serif"],
-        body: ["Aptos", "Segoe UI Variable Text", "sans-serif"],
+        display: ["General Sans", "Bahnschrift", "sans-serif"],
+        body: ["Geist Sans", "Aptos", "sans-serif"],
         mono: ["JetBrains Mono", "Consolas", "monospace"],
       },
       animation: {
         'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        marquee: 'marquee 20s linear infinite',
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        }
       }
     },
   },

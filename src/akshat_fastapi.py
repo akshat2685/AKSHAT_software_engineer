@@ -12,6 +12,10 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depe
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file before importing backend modules
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -99,7 +103,8 @@ def tools(current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
 def submit_task(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
     try:
         user_id = current_user.get("user_id", 1)
-        return core.submit(str(payload.get("prompt", "")), user_id=user_id)
+        workflow_pattern = str(payload.get("workflow_pattern", "Auto"))
+        return core.submit(str(payload.get("prompt", "")), user_id=user_id, workflow_pattern=workflow_pattern)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -108,7 +113,8 @@ def submit_task(payload: Dict[str, Any], current_user: dict = Depends(get_curren
 def chat(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
     try:
         user_id = current_user.get("user_id", 1)
-        return core.chat(str(payload.get("message", "")), user_id=user_id)
+        workflow_pattern = str(payload.get("workflow_pattern", "Auto"))
+        return core.chat(str(payload.get("message", "")), user_id=user_id, workflow_pattern=workflow_pattern)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

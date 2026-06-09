@@ -46,14 +46,21 @@ export interface ReplayEvent {
   created_at: string;
 }
 
+export interface LLMConfig {
+  cloud_url: string;
+  cloud_model: string;
+  has_key: boolean;
+  masked_key: string;
+}
+
 interface StoreState {
   // Auth
   token: string | null;
   email: string | null;
   userId: number | null;
   isAuthenticated: () => boolean;
-  login: (token: string, email: string, userId: number) => void;
-  registerUser: (token: string, email: string, userId: number) => void;
+  login: (token: string, email: string, userId: number, rememberMe: boolean) => void;
+  registerUser: (token: string, email: string, userId: number, rememberMe: boolean) => void;
   logout: () => void;
 
   // Pages
@@ -78,27 +85,38 @@ interface StoreState {
   setDensity: (density: 'normal' | 'compact') => void;
   setConnecting: (isConnecting: boolean) => void;
   fetchStatus: () => Promise<void>;
-  submitTask: (prompt: string) => Promise<void>;
+  submitTask: (prompt: string, workflowPattern?: string) => Promise<void>;
+
+  // Settings
+  isSettingsOpen: boolean;
+  llmConfig: LLMConfig | null;
+  setSettingsOpen: (isOpen: boolean) => void;
+  fetchLLMSettings: () => Promise<void>;
+  saveLLMSettings: (url: string, key: string, model: string) => Promise<boolean>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
   // Auth initial state
-  token: localStorage.getItem('akshat_token'),
-  email: localStorage.getItem('akshat_email'),
-  userId: localStorage.getItem('akshat_user_id') ? Number(localStorage.getItem('akshat_user_id')) : null,
+  token: localStorage.getItem('akshat_token') || sessionStorage.getItem('akshat_token'),
+  email: localStorage.getItem('akshat_email') || sessionStorage.getItem('akshat_email'),
+  userId: localStorage.getItem('akshat_user_id') 
+    ? Number(localStorage.getItem('akshat_user_id')) 
+    : (sessionStorage.getItem('akshat_user_id') ? Number(sessionStorage.getItem('akshat_user_id')) : null),
   isAuthenticated: () => !!get().token,
 
-  login: (token, email, userId) => {
-    localStorage.setItem('akshat_token', token);
-    localStorage.setItem('akshat_email', email);
-    localStorage.setItem('akshat_user_id', String(userId));
+  login: (token, email, userId, rememberMe) => {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem('akshat_token', token);
+    storage.setItem('akshat_email', email);
+    storage.setItem('akshat_user_id', String(userId));
     set({ token, email, userId });
   },
 
-  registerUser: (token, email, userId) => {
-    localStorage.setItem('akshat_token', token);
-    localStorage.setItem('akshat_email', email);
-    localStorage.setItem('akshat_user_id', String(userId));
+  registerUser: (token, email, userId, rememberMe) => {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem('akshat_token', token);
+    storage.setItem('akshat_email', email);
+    storage.setItem('akshat_user_id', String(userId));
     set({ token, email, userId });
   },
 
@@ -106,6 +124,9 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.removeItem('akshat_token');
     localStorage.removeItem('akshat_email');
     localStorage.removeItem('akshat_user_id');
+    sessionStorage.removeItem('akshat_token');
+    sessionStorage.removeItem('akshat_email');
+    sessionStorage.removeItem('akshat_user_id');
     set({ token: null, email: null, userId: null, currentPage: 'dashboard', systemState: null });
   },
 
@@ -204,7 +225,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  submitTask: async (prompt: string) => {
+  submitTask: async (prompt: string, workflowPattern?: string) => {
     const { token } = get();
     if (!token) return;
     try {
@@ -214,11 +235,55 @@ export const useStore = create<StoreState>((set, get) => ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ message: prompt, workflow_pattern: workflowPattern || "Auto" }),
       });
       await get().fetchStatus();
     } catch (err) {
       console.error('Failed to submit task:', err);
     }
+  },
+
+  // Settings
+  isSettingsOpen: false,
+  llmConfig: null,
+  
+  setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
+  
+  fetchLLMSettings: async () => {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const res = await fetch('/api/settings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set({ llmConfig: data });
+      }
+    } catch (err) {
+      console.error('Failed to fetch settings:', err);
+    }
+  },
+
+  saveLLMSettings: async (cloud_url: string, cloud_key: string, cloud_model: string) => {
+    const { token } = get();
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ cloud_url, cloud_key, cloud_model }),
+      });
+      if (res.ok) {
+        await get().fetchLLMSettings();
+        return true;
+      }
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    }
+    return false;
   },
 }));

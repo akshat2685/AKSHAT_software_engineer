@@ -20,7 +20,7 @@ export const AgentFeed: React.FC<AgentFeedProps> = ({ activeTab, setActiveTab })
   const statusStr = systemState?.status || 'idle';
 
   return (
-    <div className="glass-panel p-5 flex flex-col h-[340px]">
+    <div className="liquid-glass p-5 flex flex-col h-[340px]">
       <div className="text-xs tracking-wider uppercase text-gray-400 font-display mb-3 flex items-center justify-between border-b border-line pb-2 shrink-0">
         <div className="flex gap-4">
           <button

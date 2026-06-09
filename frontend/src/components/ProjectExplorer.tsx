@@ -6,7 +6,7 @@ export const ProjectExplorer: React.FC = () => {
   const { systemState } = useStore();
 
   return (
-    <div className="glass-panel p-5">
+    <div className="liquid-glass p-5 min-h-[300px]">
       <div className="text-xs tracking-wider uppercase text-gray-400 font-display mb-3 flex items-center gap-1.5 border-b border-line pb-2">
         <FolderOpen size={14} className="text-green" />
         <span>Workspace File Explorer</span>

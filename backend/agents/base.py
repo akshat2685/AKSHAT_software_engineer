@@ -76,6 +76,8 @@ class EngineeringAgent:
             f"Action: {action}\n"
             f"{command_block}"
             f"{context_block}"
+            "CRITICAL GOVERNANCE DIRECTIVE: The Governance Engine will evaluate your output for Quality, Security, Performance, and Ethics on a 1-10 scale. "
+            "You MUST generate your specialized skill to achieve a score of 7 or higher. Anything below 7 will trigger an automatic failure/remediation loop. "
             "Return concise worker output for the dashboard. Do not chat with the user."
         )
 
@@ -83,6 +85,19 @@ class EngineeringAgent:
         state.record(self.name, action, result, {"tool_result": tool_result or {}})
 
     def private_command(self) -> str:
+        try:
+            from backend.database.connection import SessionLocal
+            from backend.database.models import AgentPromptOverride
+            db = SessionLocal()
+            try:
+                override = db.query(AgentPromptOverride).filter(AgentPromptOverride.agent_role == self.role).first()
+                if override and override.prompt_content:
+                    return override.prompt_content
+            finally:
+                db.close()
+        except Exception:
+            pass
+
         path = ROOT / "config" / "agents" / f"{self.role}.prompt"
         if not path.exists():
             return ""

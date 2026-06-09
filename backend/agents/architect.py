@@ -9,37 +9,39 @@ class ArchitectAgent(EngineeringAgent):
     name = "Architect"
     role = "architect"
 
-    def determine_next_action(self, state: Any, objective: str) -> str:
-        task_type = getattr(state, "task_type", "general")
-        if task_type in {"website", "deploy"}:
-            return "Design the artifact, deployment route, and review surfaces"
-        if task_type == "research":
-            return "Design the report structure and evidence trail"
-        if task_type == "bug_fix":
-            return "Design the minimal fix and validation loop"
-        return "Design backend, database, agent graph, services, tools, and dashboard surfaces"
+    def prompt_for_model(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
+        req_str = "- " + "\n- ".join(getattr(state, "requirements", ["No specific requirements"]))
+        mem_ctx = getattr(state, "agent_context", {}).get(self.name, {}).get("memory_engine_context", "")
+        return (
+            f"You are the Architect.\n"
+            f"Task: {state.user_request}\n"
+            f"Requirements:\n{req_str}\n"
+            f"{mem_ctx}\n"
+            f"Return ONLY a JSON object with a single list of strings named 'architecture'.\n"
+            f"Example format:\n"
+            f'{{"architecture": ["FastAPI backend", "React frontend", "PostgreSQL database"]}}'
+        )
 
     def update_state(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
-        task_type = getattr(state, "task_type", "general")
-        if task_type in {"website", "deploy"}:
-            state.architecture = [
-                "Developer creates the browser artifact inside src/assets.",
-                "Tester validates the build before publishing.",
-                "Deploy publishes the artifact to a stable /deploy/<name> URL.",
-                "Reviewer confirms the live preview and source remain aligned.",
-            ]
-        elif task_type == "research":
-            state.architecture = [
-                "Developer produces a readable review page with the answer and evidence.",
-                "Reviewer checks clarity, safety, and answer quality.",
-                "Memory stores the prompt-to-artifact history for reuse.",
-            ]
-        else:
-            state.architecture = [
-                "Backend agents are workers managed by a prompt-routed workflow.",
-                "Tester branches to Reviewer on pass and Improver on fail.",
-                "Ollama access is centralized through services/ollama_service.py.",
-                "Database models track requirements, architecture, agent runs, tests, and replay events.",
-                "Dashboard remains the primary project-owner interface.",
-            ]
-        return "\n".join(state.architecture)
+        from backend.services.ollama_service import generate_response
+        import json
+        import re
+
+        prompt = self.prompt_for_model(state, objective, action, tool_result)
+        response = generate_response(self.role, prompt)
+
+        state.architecture = [
+            "Developer creates the browser artifact inside src/assets.",
+            "Tester validates the build before publishing."
+        ]
+
+        try:
+            match = re.search(r'\{.*\}', response.replace('\n', ' '), re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                if isinstance(data.get("architecture"), list) and data["architecture"]:
+                    state.architecture = data["architecture"]
+        except Exception:
+            pass
+
+        return "\n".join(f"- {a}" for a in state.architecture)

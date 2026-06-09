@@ -9,50 +9,39 @@ class ProjectManagerAgent(EngineeringAgent):
     name = "ProjectManager"
     role = "project_manager"
 
-    def determine_next_action(self, state: Any, objective: str) -> str:
-        return "Extract requirements and define execution tasks"
+    def prompt_for_model(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
+        mem_ctx = getattr(state, "agent_context", {}).get(self.name, {}).get("memory_engine_context", "")
+        return (
+            f"You are the Project Manager.\n"
+            f"Analyze this user request deeply: {state.user_request}\n"
+            f"{mem_ctx}\n"
+            f"Return ONLY a JSON object with two lists of strings: 'requirements' and 'tasks'.\n"
+            f"Example format:\n"
+            f'{{"requirements": ["Must be a responsive portfolio", "Needs drag and drop functionality"], "tasks": ["Setup layout", "Implement drag and drop", "Style components"]}}'
+        )
 
     def update_state(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
-        task_type = getattr(state, "task_type", "general")
-        state.requirements = [
-            state.user_request,
-            "Execute autonomously through dashboard-visible worker agents.",
-            "Do not behave as a chatbot or ask conversational follow-up during execution.",
-        ]
-        if task_type == "research":
-            state.tasks = [
-                "Summarize the request",
-                "Generate a readable answer artifact",
-                "Review the response for clarity and accuracy",
-                "Store the research outcome for reuse",
-            ]
-        elif task_type in {"website", "deploy"}:
-            state.tasks = [
-                "Read workflow state",
-                "Design the browser artifact",
-                "Generate or modify the website output",
-                "Validate the build",
-                "Publish the local deployment URL",
-                "Review the deployment for readiness",
-                "Store learning for replay",
-            ]
-        elif task_type == "bug_fix":
-            state.tasks = [
-                "Read workflow state",
-                "Inspect failure details",
-                "Generate the minimal fix",
-                "Re-run validation",
-                "Review the corrected output",
-                "Store learning for replay",
-            ]
-        else:
-            state.tasks = [
-                "Read workflow state",
-                "Read available memory",
-                "Design implementation",
-                "Generate or modify code",
-                "Run validation",
-                "Review quality and risks",
-                "Store learning for replay",
-            ]
-        return "Requirements captured for autonomous execution.\n" + "\n".join(state.tasks)
+        from backend.services.ollama_service import generate_response
+        import json
+        import re
+
+        prompt = self.prompt_for_model(state, objective, action, tool_result)
+        response = generate_response(self.role, prompt)
+
+        # Set fallbacks in case parsing fails
+        state.requirements = [state.user_request, "Autonomously execute tasks."]
+        state.tasks = ["Plan", "Design", "Implement", "Review"]
+
+        try:
+            # Look for JSON block
+            match = re.search(r'\{.*\}', response.replace('\n', ' '), re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                if isinstance(data.get("requirements"), list) and data["requirements"]:
+                    state.requirements = data["requirements"]
+                if isinstance(data.get("tasks"), list) and data["tasks"]:
+                    state.tasks = data["tasks"]
+        except Exception:
+            pass
+
+        return "Requirements captured for autonomous execution:\n" + "\n".join(f"- {t}" for t in state.tasks)

@@ -152,7 +152,7 @@ class AkshatCore:
         except Exception:
             pass
 
-    def submit(self, prompt: str, user_id: int = 1) -> Dict[str, Any]:
+    def submit(self, prompt: str, user_id: int = 1, workflow_pattern: str = "Auto") -> Dict[str, Any]:
         prompt = (prompt or "").strip()
         if not prompt:
             raise ValueError("prompt is required")
@@ -184,10 +184,10 @@ class AkshatCore:
             pass
 
         self.emit("task_received", f"Received task: {prompt}", {"prompt": prompt})
-        threading.Thread(target=self._run, args=(prompt,), daemon=True).start()
+        threading.Thread(target=self._run, args=(prompt, workflow_pattern), daemon=True).start()
         return self.snapshot()
 
-    def chat(self, message: str, user_id: int = 1) -> Dict[str, Any]:
+    def chat(self, message: str, user_id: int = 1, workflow_pattern: str = "Auto") -> Dict[str, Any]:
         message = (message or "").strip()
         if not message:
             raise ValueError("message is required")
@@ -205,9 +205,9 @@ class AkshatCore:
             return {"mode": "chat", "reply": reply, "state": self.snapshot()}
 
         if user_id == 1:
-            self.submit(message)
+            self.submit(message, workflow_pattern=workflow_pattern)
         else:
-            self.submit(message, user_id=user_id)
+            self.submit(message, user_id=user_id, workflow_pattern=workflow_pattern)
         reply = "Task accepted. I am routing it through the engineering workflow and will return a review link when an artifact is produced."
         with self.lock:
             self.state.chat.extend([{"role": "user", "content": message}, {"role": "assistant", "content": reply}])
@@ -256,6 +256,8 @@ class AkshatCore:
                 str(args.get("artifact_name", "")),
                 str(args.get("artifact_version", "")),
                 str(args.get("task_type", "")),
+                args.get("requirements", []),
+                args.get("architecture", []),
             ),
             "deploy_artifact": lambda: self.deploy_artifact(
                 str(args.get("artifact_name", "")),
@@ -351,13 +353,13 @@ class AkshatCore:
         build["summary"] = "artifact files validated and build passed" if build.get("success") else "build failed after artifact validation"
         return build
 
-    def build_artifact(self, prompt: str, artifact_name: str = "", artifact_version: str = "", task_type: str = "") -> Dict[str, Any]:
+    def build_artifact(self, prompt: str, artifact_name: str = "", artifact_version: str = "", task_type: str = "", requirements: list = None, architecture: list = None) -> Dict[str, Any]:
         prompt = (prompt or "Build a landing page").strip()
         safe_prompt = self._escape_html(prompt)
         artifact_title = self._artifact_title(prompt)
         artifact_name = (artifact_name or self._artifact_name(prompt)).strip()
         if self._is_project_prompt(prompt, task_type):
-            return self._build_project_artifact(prompt, artifact_title, artifact_name, artifact_version)
+            return self._build_project_artifact(prompt, artifact_title, artifact_name, artifact_version, requirements, architecture)
 
         model_html = self._generate_artifact_with_ollama(prompt, artifact_title)
         html = model_html or self._fallback_artifact_html(prompt, artifact_title, safe_prompt)
@@ -402,9 +404,9 @@ class AkshatCore:
             "summary": f"Published {artifact_name} to {deploy_url}",
         }
 
-    def _build_project_artifact(self, prompt: str, artifact_title: str, artifact_name: str, artifact_version: str) -> Dict[str, Any]:
+    def _build_project_artifact(self, prompt: str, artifact_title: str, artifact_name: str, artifact_version: str, requirements: list = None, architecture: list = None) -> Dict[str, Any]:
         project_root = f"projects/{artifact_name}"
-        files, used_model = self._generate_project_with_ollama(prompt, artifact_title)
+        files, used_model = self._generate_project_with_ollama(prompt, artifact_title, requirements, architecture)
         if not files:
             files = self._fallback_project_files(prompt, artifact_title)
             used_model = False
@@ -435,14 +437,20 @@ class AkshatCore:
             "summary": f"Created project artifact with {len(created_files)} files at {project_root}",
         }
 
-    def _generate_project_with_ollama(self, prompt: str, artifact_title: str) -> tuple[List[Dict[str, str]], bool]:
+    def _generate_project_with_ollama(self, prompt: str, artifact_title: str, requirements: list = None, architecture: list = None) -> tuple[List[Dict[str, str]], bool]:
+        req_str = "- " + "\n- ".join(requirements) if requirements else "None"
+        arch_str = "- " + "\n- ".join(architecture) if architecture else "None"
+        
         response = self._ollama(
-            "You are AKSHAT's Developer agent. Return strict JSON only for a small static web project.\n"
+            "You are AKSHAT's Developer agent. Return strict JSON only for a web project.\n"
             "Schema: {\"entry\":\"index.html\",\"files\":[{\"path\":\"index.html\",\"content\":\"...\"}]}.\n"
-            "Required files: index.html, styles.css, script.js, manifest.json.\n"
-            "Use external files, not inline CSS or inline JavaScript. Do not include secrets or credentials.\n"
-            "Make the result visually specific to the user prompt, responsive, and interactive when appropriate.\n"
-            f"Title: {artifact_title}\nUser prompt: {prompt}"
+            "You must generate ALL files described in the architecture. Do not skip any files.\n"
+            "Use external files for CSS and JavaScript (e.g. styles.css, script.js). Do not include inline secrets.\n"
+            "Make the code high quality, production-ready, beautiful and robust.\n"
+            f"Title: {artifact_title}\n"
+            f"User prompt: {prompt}\n"
+            f"Requirements:\n{req_str}\n"
+            f"Architecture:\n{arch_str}\n"
         )
         raw = self._extract_json_object(response)
         if not raw:
@@ -462,9 +470,6 @@ class AkshatCore:
             content = str(item.get("content", ""))
             if path and content:
                 cleaned.append({"path": path, "content": content})
-        required = {"index.html", "styles.css", "script.js", "manifest.json"}
-        if not required.issubset({item["path"] for item in cleaned}):
-            return [], False
         return cleaned, True
 
     def _write_project_files(self, project_root: str, files: List[Dict[str, str]]) -> List[str]:
@@ -693,11 +698,11 @@ class AkshatCore:
     def store_memory(self, kind: str, prompt: str, summary: str, payload: Dict[str, Any]) -> None:
         self.memory.add(kind, prompt, summary, payload)
 
-    def _run(self, prompt: str) -> None:
+    def _run(self, prompt: str, workflow_pattern: str = "Auto") -> None:
         try:
             memories = self.memory.search(prompt, 5)
             repo = self._repo_scan()
-            workflow = self.orchestrator.run(self.state.task_id, prompt, [m["summary"] for m in memories], repo, self._habit_summary(), self.emit)
+            workflow = self.orchestrator.run(self.state.task_id, prompt, [m["summary"] for m in memories], repo, self._habit_summary(), self.emit, workflow_pattern)
             completion = workflow.get("structured_result", {}) or {}
             plan = workflow.get("tasks", []) or self.create_plan(prompt)
             validation_result = workflow.get("build_results") or workflow.get("test_results") or {}
@@ -763,6 +768,12 @@ class AkshatCore:
             self.memory.add("task_result", prompt, reflection, {"workflow": workflow, "completion": completion, "tests": self.state.tests})
             if "software engineer" in prompt.lower() or "agent" in prompt.lower():
                 self.memory.add_habit("agent_identity", "AKSHAT should behave like a software engineer, not a chatbot.", 0.95, {"prompt": prompt})
+
+            try:
+                from backend.services.self_improvement_engine import engine as self_engine
+                self_engine.evaluate_project(self.state.task_id, asdict(self.state), passed)
+            except Exception as e:
+                pass
         except Exception as exc:
             with self.lock:
                 self.state.avatar_state = "Error"

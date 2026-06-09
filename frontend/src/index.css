@@ -1,18 +1,19 @@
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    --background: 260 87% 3%;
+    --foreground: 40 6% 95%;
+    --hero-sub: 40 6% 82%;
     --accent-color: #38d5ff; /* Default Cyan */
   }
 
   body {
-    @apply m-0 min-h-screen overflow-x-hidden bg-bg text-gray-200 font-body select-none;
-    background: radial-gradient(circle at 18% 18%, rgba(56, 213, 255, 0.12), transparent 26%),
-                radial-gradient(circle at 82% 22%, rgba(76, 242, 161, 0.08), transparent 24%),
-                radial-gradient(circle at 50% 84%, rgba(255, 209, 102, 0.05), transparent 30%),
-                #03050b;
+    @apply m-0 min-h-screen overflow-x-hidden bg-background text-foreground font-body select-none;
   }
 
   /* Custom scrollbars */
@@ -32,14 +33,44 @@
   }
 }
 
-/* Glassmorphism Panel styles */
+/* Liquid Glass Panel styles */
 .glass-panel {
   @apply relative overflow-hidden rounded-xl border border-line bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-md;
 }
 
-.glass-panel::before {
-  content: "";
-  @apply absolute inset-0 pointer-events-none opacity-70 bg-gradient-to-br from-white/10 via-transparent to-white/5;
+.liquid-glass { 
+  background: rgba(255, 255, 255, 0.01); 
+  background-blend-mode: luminosity; 
+  backdrop-filter: blur(4px); 
+  border: none; 
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1); 
+  position: relative; 
+  overflow: hidden; 
+}
+.liquid-glass::before { 
+  content: ""; 
+  position: absolute; 
+  inset: 0; 
+  border-radius: inherit; 
+  padding: 1.4px; 
+  background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%); 
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); 
+  -webkit-mask-composite: xor; 
+  mask-composite: exclude; 
+  pointer-events: none; 
+}
+
+/* Secondary Button Variant */
+.heroSecondary {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all 0.2s ease;
+}
+.heroSecondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Neural Network Background Canvas */

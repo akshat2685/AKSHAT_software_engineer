@@ -4,13 +4,15 @@ import { WebSocketClient } from './services/websocket';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { Timeline } from './pages/Timeline';
+import { SettingsModal } from './components/SettingsModal';
 import { 
   LogOut, 
   Layers, 
   LayoutDashboard, 
   FolderGit2, 
   Lock, 
-  Mail 
+  Mail,
+  Settings
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -30,7 +32,8 @@ export const App: React.FC = () => {
     fetchStatus, 
     setTheme, 
     setDensity, 
-    setSystemState
+    setSystemState,
+    setSettingsOpen
   } = useStore();
 
   // Auth local state
@@ -39,6 +42,7 @@ export const App: React.FC = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authRememberMe, setAuthRememberMe] = useState(false);
 
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -177,9 +181,9 @@ export const App: React.FC = () => {
       }
 
       if (authMode === 'login') {
-        login(data.token, data.email, data.user_id);
+        login(data.token, data.email, data.user_id, authRememberMe);
       } else {
-        registerUser(data.token, data.email, data.user_id);
+        registerUser(data.token, data.email, data.user_id, authRememberMe);
       }
       setAuthEmail('');
       setAuthPassword('');
@@ -250,6 +254,19 @@ export const App: React.FC = () => {
                   required
                 />
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-1">
+              <input 
+                type="checkbox" 
+                id="rememberMe"
+                checked={authRememberMe}
+                onChange={(e) => setAuthRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-line bg-slate-900 text-cyan focus:ring-cyan/50"
+              />
+              <label htmlFor="rememberMe" className="text-xs text-gray-400 cursor-pointer">
+                Remember me
+              </label>
             </div>
 
             <button
@@ -363,6 +380,15 @@ export const App: React.FC = () => {
             <span className="font-mono text-green-300 font-semibold">{activeAgent}</span>
           </div>
 
+          {/* Settings Button */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Configure LLM"
+            className="p-2 border border-line rounded-lg bg-slate-900/40 hover:bg-white/10 hover:border-white/30 text-gray-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <Settings size={15} />
+          </button>
+
           {/* Logout */}
           <button
             onClick={() => logout()}
@@ -380,6 +406,9 @@ export const App: React.FC = () => {
         {currentPage === 'projects' && <Projects />}
         {currentPage === 'timeline' && <Timeline />}
       </main>
+
+      {/* Modals */}
+      <SettingsModal />
     </div>
   );
 };

@@ -58,11 +58,16 @@ class AgentRun(Base):
 class Memory(Base):
     __tablename__ = "memories"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    problem = Column(Text, nullable=False)
-    solution = Column(Text, nullable=False)
-    outcome = Column(Text, nullable=False)
-    tags = Column(String(255), default="")
+    id = Column(String(80), primary_key=True)
+    memory_type = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    source_agent = Column(String(50), nullable=False)
+    project_id = Column(String(80), nullable=True)
+    task_id = Column(String(80), nullable=True)
+    tags = Column(Text, default="[]")
+    outcome = Column(String(50), nullable=False)
+    dependencies = Column(Text, default="[]")
+    confidence = Column(String(50), default="certain")
     created_at = Column(DateTime, default=utc_now)
 
 class TestResult(Base):
@@ -96,3 +101,47 @@ class Event(Base):
             return json.loads(self.payload)
         except Exception:
             return {}
+
+class ProjectMetrics(Base):
+    __tablename__ = "project_metrics"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(String(80), ForeignKey("projects.id"), nullable=False)
+    success = Column(Boolean, default=False)
+    first_pass_quality = Column(Boolean, default=True)
+    cost_efficiency = Column(Integer, default=100)
+    user_satisfaction = Column(Integer, default=100)
+    knowledge_reuse_rate = Column(Integer, default=0)
+    health_score = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utc_now)
+    project = relationship("Project")
+
+class OrganizationHealth(Base):
+    __tablename__ = "organization_health"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    score = Column(Integer, nullable=False)
+    trend = Column(String(10), default="-")
+    projects_analyzed = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utc_now)
+
+class ImprovementChangelog(Base):
+    __tablename__ = "improvement_changelog"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(50), nullable=False)
+    rationale = Column(Text, nullable=False)
+    proposed_changes = Column(Text, nullable=False)
+    status = Column(String(50), default="proposed")
+    created_at = Column(DateTime, default=utc_now)
+
+class AgentPromptOverride(Base):
+    __tablename__ = "agent_prompt_override"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_role = Column(String(100), unique=True, nullable=False)
+    prompt_content = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    setting_key = Column(String(100), unique=True, nullable=False)
+    setting_value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

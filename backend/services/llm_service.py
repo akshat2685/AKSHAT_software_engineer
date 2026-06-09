@@ -64,10 +64,61 @@ class LLMService:
             fallback_val = os.environ.get("CLOUD_FALLBACK_ENABLED") or os.environ.get("AKSHAT_CLOUD_FALLBACK", "true")
             self.cloud_fallback_enabled = fallback_val.strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
 
+        # DB Overrides
+        self._load_db_settings()
+
         # Providers
         self.ollama_provider = OllamaProvider(self.ollama_url, self.ollama_model, self.ollama_timeout)
         self.cloud_provider = CloudProvider(self.cloud_url, self.cloud_model, self.cloud_key)
         self.cloud = self.cloud_provider
+
+    def _load_db_settings(self):
+        try:
+            from backend.database.connection import SessionLocal
+            from backend.database.models import SystemSettings
+            db = SessionLocal()
+            try:
+                db_url = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_url").first()
+                db_key = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_key").first()
+                db_model = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_model").first()
+                
+                if db_url and db_url.setting_value:
+                    self.cloud_url = db_url.setting_value
+                if db_key and db_key.setting_value:
+                    self.cloud_key = db_key.setting_value
+                if db_model and db_model.setting_value:
+                    self.cloud_model = db_model.setting_value
+            finally:
+                db.close()
+        except Exception as e:
+            LOGGER.error("Failed to load DB settings: %s", e)
+
+    def update_config(self, cloud_url: str, cloud_key: str, cloud_model: str):
+        from backend.database.connection import SessionLocal
+        from backend.database.models import SystemSettings
+        db = SessionLocal()
+        try:
+            def _upsert(key, val):
+                s = db.query(SystemSettings).filter(SystemSettings.setting_key == key).first()
+                if not s:
+                    s = SystemSettings(setting_key=key)
+                    db.add(s)
+                s.setting_value = val
+
+            if cloud_url: _upsert("cloud_url", cloud_url)
+            if cloud_key: _upsert("cloud_key", cloud_key)
+            if cloud_model: _upsert("cloud_model", cloud_model)
+            
+            db.commit()
+
+            # Apply to current instance
+            self._load_db_settings()
+            from backend.services.providers.cloud_provider import CloudProvider
+            self.cloud_provider = CloudProvider(self.cloud_url, self.cloud_model, self.cloud_key)
+            self.cloud = self.cloud_provider
+            self.cloud_fallback_enabled = True # Always enable fallback if user sets custom keys
+        finally:
+            db.close()
 
     def generate(
         self,
@@ -114,6 +165,8 @@ class LLMService:
             "provider": "Local inference engine",
             "url": self.ollama_url,
             "configured_model": self.ollama_model,
+            "cloud_configured_model": self.cloud_model,
+            "cloud_configured_url": self.cloud_url,
             "resolved_model": ollama_status.get("resolved_model", ""),
             "connected": ollama_status.get("connected", False),
             "installed": ollama_status.get("installed", False),
@@ -123,9 +176,19 @@ class LLMService:
             "cloud": cloud_status,
         }
 
+    def _get_system_prompt(self, role: str) -> str:
+        from pathlib import Path
+        root_dir = Path(__file__).resolve().parents[2]
+        master_prompt_path = root_dir / "config" / "master_system.prompt"
+        master_prompt = ""
+        if master_prompt_path.exists():
+            master_prompt = master_prompt_path.read_text(encoding="utf-8").strip()
+        return f"{master_prompt}\n\nYou are AKSHAT's {role} agent." if master_prompt else f"You are AKSHAT's {role} agent."
+
     def _generate_with_ollama(self, role: str, prompt: str, model: str, started: float) -> tuple[str, str]:
         try:
-            res = self.ollama_provider.generate(prompt=prompt, system_prompt=f"You are AKSHAT's {role} agent.")
+            sys_prompt = self._get_system_prompt(role)
+            res = self.ollama_provider.generate(prompt=prompt, system_prompt=sys_prompt)
             return res, "ok"
         except Exception as e:
             return "", str(e)
@@ -143,7 +206,8 @@ class LLMService:
         
         # Fallback to cloud
         if self.cloud_fallback_enabled and self.cloud_provider.is_ready():
-            return self.cloud.generate_response(role, prompt)
+            sys_prompt = self._get_system_prompt(role)
+            return self.cloud_provider.generate(prompt=prompt, system_prompt=sys_prompt)
         return ""
 
 # Singleton service instance

@@ -1,36 +1,40 @@
 import React, { useState } from 'react';
 import { Play, Cpu, CheckCircle, ExternalLink, Layers } from 'lucide-react';
 import { useStore } from '../stores/projectStore';
-import { AvatarPanel } from '../components/AvatarPanel';
 import { MetricsPanel } from '../components/MetricsPanel';
 import { AgentFeed } from '../components/AgentFeed';
 import { ProjectExplorer } from '../components/ProjectExplorer';
+import { Hero } from '../components/Hero';
+import { AgentRoster } from '../components/AgentRoster';
 
 export const Dashboard: React.FC = () => {
   const { systemState, submitTask } = useStore();
   const [prompt, setPrompt] = useState('');
+  const [workflowPattern, setWorkflowPattern] = useState('Auto');
   const [activeTab, setActiveTab] = useState<'activity' | 'chat'>('activity');
 
   const handleRun = () => {
     if (!prompt.trim()) return;
-    submitTask(prompt);
+    submitTask(prompt, workflowPattern);
     setPrompt('');
   };
 
   const statusStr = systemState?.status || 'idle';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Left Column (Avatar & System Vitals) */}
-      <section className="lg:col-span-4 flex flex-col gap-6">
-        <AvatarPanel />
-        <MetricsPanel />
-      </section>
+    <div className="bg-background min-h-screen">
+      <Hero />
+      
+      <div className="max-w-[1800px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-20 -mt-10">
+        {/* Left Column (System Vitals & Roster) */}
+        <section className="lg:col-span-3 flex flex-col gap-6">
+          <div className="h-[420px]"><MetricsPanel /></div>
+        </section>
 
-      {/* Right Column (Workspace Console, Activity logs, Timeline, Explorer) */}
-      <section className="lg:col-span-8 flex flex-col gap-6">
+        {/* Center Column (Workspace Console, Activity logs) */}
+        <section className="lg:col-span-6 flex flex-col gap-6">
         {/* Project Console (Workspace Intake) */}
-        <div className="glass-panel p-6">
+        <div className="liquid-glass p-6">
           <div className="text-xs tracking-wider uppercase text-gray-400 font-display mb-3 flex items-center gap-2">
             <Cpu size={14} className="text-cyan" />
             <span>Autonomy Intake Workspace</span>
@@ -42,6 +46,21 @@ export const Dashboard: React.FC = () => {
           <p className="text-sm text-gray-400 mb-6 max-w-xl font-medium">
             Describe your software project prompt below. AKSHAT routes the instructions autonomously through PM, Architect, Developer, Tester, Reviewer, and Memory agents.
           </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <select
+              value={workflowPattern}
+              onChange={(e) => setWorkflowPattern(e.target.value)}
+              className="bg-slate-900 border border-line text-gray-300 text-sm rounded-lg focus:ring-cyan focus:border-cyan block p-2.5 w-full outline-none"
+            >
+              <option value="Auto">Auto: Dynamically selects the best pattern based on prompt context.</option>
+              <option value="A">Pattern A (Sequential): Strict line: PM → Architect → Developer → Tester → Deploy.</option>
+              <option value="B">Pattern B (Parallel Swarm): Runs Agents concurrently using threads for massive tasks.</option>
+              <option value="C">Pattern C (Adversarial Loop): Traps Tester and Developer in a strict retry loop for secure bugs.</option>
+              <option value="D">Pattern D (Spike-Then-Build): Heavily weighted towards research before writing code.</option>
+              <option value="E">Pattern E (Hotfix Express): Skips PM/Architect and rushes Improver to deploy an emergency patch.</option>
+            </select>
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <input
@@ -90,7 +109,7 @@ export const Dashboard: React.FC = () => {
           <AgentFeed activeTab={activeTab} setActiveTab={setActiveTab} />
 
           {/* Real-time Project Tasks */}
-          <div className="glass-panel p-5 flex flex-col h-[340px]">
+          <div className="liquid-glass p-5 flex flex-col h-[340px]">
             <div className="text-xs tracking-wider uppercase text-gray-400 font-display mb-3 flex items-center gap-1.5 border-b border-line pb-2 shrink-0">
               <Layers size={14} className="text-amber" />
               <span>Active Project Tasks</span>
@@ -121,9 +140,14 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      </section>
 
+      {/* Right Column (Agent Roster & Explorer) */}
+      <section className="lg:col-span-3 flex flex-col gap-6">
+        <div className="h-[420px]"><AgentRoster /></div>
         <ProjectExplorer />
       </section>
+      </div>
     </div>
   );
 };

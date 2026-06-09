@@ -11,8 +11,20 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from backend.database.connection import get_db
 from backend.database.models import User, Project, Event
+from supabase import create_client, Client
 
 router = APIRouter(prefix="", tags=["auth"])
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+
+def get_supabase() -> Client | None:
+    if SUPABASE_URL and SUPABASE_KEY:
+        try:
+            return create_client(SUPABASE_URL, SUPABASE_KEY)
+        except Exception:
+            return None
+    return None
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "akshat_v2_super_secret_key_123456")
 JWT_ALGORITHM = "HS256"
@@ -79,15 +91,30 @@ def get_current_user(authorization: str = Header(None)) -> dict:
 
 @router.post("/auth/register")
 def register(payload: AuthRequest, db: Session = Depends(get_db)):
+    supabase = get_supabase()
+    
+    if supabase:
+        try:
+            # Register with Supabase
+            res = supabase.auth.sign_up({"email": payload.email, "password": payload.password})
+            if not res or not res.user:
+                raise HTTPException(status_code=400, detail="Supabase registration failed")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+            
+    # Check local DB
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
-        raise HTTPException(status_code=400, detail="User already registered")
-    
-    hashed = hash_password(payload.password)
-    user = User(email=payload.email, password_hash=hashed)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+        if not supabase:
+            raise HTTPException(status_code=400, detail="User already registered locally")
+        user = existing
+    else:
+        # Create local user record for foreign keys
+        hashed = hash_password(payload.password) if not supabase else ""
+        user = User(email=payload.email, password_hash=hashed)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     
     token_payload = {"user_id": user.id, "email": user.email, "exp": time.time() + 86400}
     token = create_jwt_token(token_payload)
@@ -95,9 +122,27 @@ def register(payload: AuthRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/login")
 def login(payload: AuthRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
+    supabase = get_supabase()
+    
+    if supabase:
+        try:
+            res = supabase.auth.sign_in_with_password({"email": payload.email, "password": payload.password})
+            if not res or not res.session:
+                raise HTTPException(status_code=400, detail="Invalid Supabase credentials")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+            
+        # Ensure local user exists
+        user = db.query(User).filter(User.email == payload.email).first()
+        if not user:
+            user = User(email=payload.email, password_hash="")
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+    else:
+        user = db.query(User).filter(User.email == payload.email).first()
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Invalid email or password")
     
     token_payload = {"user_id": user.id, "email": user.email, "exp": time.time() + 86400}
     token = create_jwt_token(token_payload)
@@ -136,3 +181,38 @@ def get_replay_events(id: str, current_user: dict = Depends(get_current_user), d
             "created_at": e.created_at.isoformat()
         } for e in events
     ]
+
+class SettingsUpdate(BaseModel):
+    cloud_url: str = ""
+    cloud_key: str = ""
+    cloud_model: str = ""
+
+@router.get("/api/settings")
+def get_settings(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    from backend.database.models import SystemSettings
+    db_url = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_url").first()
+    db_key = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_key").first()
+    db_model = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_model").first()
+    
+    url = db_url.setting_value if db_url else ""
+    key = db_key.setting_value if db_key else ""
+    model = db_model.setting_value if db_model else ""
+    
+    # Do not send the full key to the frontend for security, just whether it exists
+    has_key = bool(key)
+    masked_key = key[:4] + "..." + key[-4:] if key and len(key) > 8 else ("***" if key else "")
+
+    return {
+        "cloud_url": url,
+        "cloud_model": model,
+        "has_key": has_key,
+        "masked_key": masked_key
+    }
+
+@router.post("/api/settings")
+def update_settings(data: SettingsUpdate, current_user: dict = Depends(get_current_user)):
+    from backend.services.llm_service import _default_service
+    # If the frontend passes a dummy masked string, don't override the actual key
+    actual_key = data.cloud_key if data.cloud_key and not data.cloud_key.startswith("***") and "..." not in data.cloud_key else ""
+    _default_service.update_config(data.cloud_url, actual_key, data.cloud_model)
+    return {"status": "success"}

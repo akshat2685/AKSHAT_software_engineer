@@ -5,15 +5,15 @@ from typing import Any, Dict
 from backend.agents.base import EngineeringAgent
 
 
-class DeployAgent(EngineeringAgent):
-    name = "Deploy"
-    role = "deploy"
+class DevOpsAgent(EngineeringAgent):
+    name = "DevOps"
+    role = "devops"
 
     def determine_next_action(self, state: Any, objective: str) -> str:
-        return "Publish the validated artifact to a stable local deployment URL"
+        return "Generate CI/CD pipelines, Infrastructure-as-Code, and publish artifact."
 
     def select_tool(self, state: Any, action: str) -> tuple[str | None, Dict[str, Any]]:
-        context = getattr(state, "agent_context", {}).get("Deploy", {})
+        context = getattr(state, "agent_context", {}).get("DevOps", {})
         return "deploy_artifact", {
             "artifact_name": context.get("artifact_name", getattr(state, "artifact_name", "")),
             "artifact_version": context.get("artifact_version", getattr(state, "artifact_version", "")),
@@ -25,7 +25,9 @@ class DeployAgent(EngineeringAgent):
         }
 
     def update_state(self, state: Any, objective: str, action: str, tool_result: Dict[str, Any] | None) -> str:
+        llm_response = super().update_state(state, objective, action, tool_result)
         result = tool_result or {"success": False, "message": "Deployment failed"}
+        
         if result.get("success"):
             state.deployment_status = "published"
             state.deployment_url = str(result.get("deploy_url") or result.get("url") or "")
@@ -36,13 +38,9 @@ class DeployAgent(EngineeringAgent):
                 state.artifact_history[-1]["deployment_url"] = state.deployment_url
                 state.artifact_history[-1]["deploy_url"] = state.deployment_url
                 state.artifact_history[-1]["output_url"] = state.artifact_output_url
-            state.final_deliverable = (
-                f"Deployed artifact: {state.artifact_name}\n"
-                f"Deploy URL: {state.deployment_url}\n"
-                f"Review URL: {state.artifact_url}"
-            )
-            return f"Deployment published at {state.deployment_url}"
+            state.final_deliverable = f"{llm_response}\n\nDeployed artifact: {state.artifact_name}\nDeploy URL: {state.deployment_url}\nReview URL: {state.artifact_url}"
+            return state.final_deliverable
 
         state.deployment_status = "failed"
-        state.final_deliverable = f"Deployment failed for {state.artifact_name or state.user_request}"
+        state.final_deliverable = f"{llm_response}\n\nDeployment failed for {state.artifact_name or state.user_request}"
         return state.final_deliverable

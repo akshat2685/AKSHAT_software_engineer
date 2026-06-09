@@ -2,3 +2,7 @@ fastapi
 uvicorn
 langgraph
 sqlalchemy
+bcrypt
+supabase
+python-dotenv
+chromadb

@@ -23,6 +23,8 @@ class DeveloperAgent(EngineeringAgent):
             "artifact_name": context.get("artifact_name", getattr(state, "artifact_name", "")),
             "artifact_version": context.get("artifact_version", getattr(state, "artifact_version", "")),
             "task_type": context.get("task_type", getattr(state, "task_type", "")),
+            "requirements": getattr(state, "requirements", []),
+            "architecture": getattr(state, "architecture", []),
             "reason": "Every user prompt must produce a reviewable browser artifact.",
         }
 
