@@ -10,23 +10,24 @@ export default {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         'hero-sub': 'hsl(var(--hero-sub))',
-        panel: 'rgba(8, 13, 25, 0.68)',
-        glass: 'rgba(255, 255, 255, 0.075)',
-        line: 'rgba(255, 255, 255, 0.14)',
-        cyan: '#38d5ff',
-        green: '#4cf2a1',
-        amber: '#ffd166',
-        danger: '#ff6b7d',
-        violet: '#a78bfa',
+        panel: 'rgba(250, 248, 245, 0.95)',
+        glass: 'rgba(0, 0, 0, 0.05)',
+        line: 'rgba(0, 0, 0, 0.15)',
+        midground: '#1c1917', // Off-black
+        cream: '#faf8f5',     // Vintage cream
+        'accent-red': '#ff2702', // Nous orange-red
+        cyan: '#06b6d4',
+        green: '#10b981',
       },
       fontFamily: {
-        display: ["General Sans", "Bahnschrift", "sans-serif"],
-        body: ["Geist Sans", "Aptos", "sans-serif"],
+        display: ["VT323", "monospace"],
+        body: ["Courier Prime", "monospace"],
         mono: ["JetBrains Mono", "Consolas", "monospace"],
+        sharetech: ["Share Tech Mono", "monospace"],
       },
       animation: {
         'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        marquee: 'marquee 20s linear infinite',
+        marquee: 'marquee 25s linear infinite',
       },
       keyframes: {
         marquee: {
