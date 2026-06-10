@@ -12,11 +12,11 @@
   "routes": [
     {
       "src": "/frontend-assets/(.*)",
-      "dest": "frontend/dist/frontend-assets/$1"
+      "dest": "/frontend-assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/$1"
+      "dest": "/index.html"
     }
   ]
 }
