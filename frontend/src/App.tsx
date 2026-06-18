@@ -343,13 +343,12 @@ export const App: React.FC = () => {
             
             <nav className="flex items-center gap-6 text-sm">
               <a href="#features" className="text-slate-400 hover:text-white transition-colors">Features</a>
-              <a href="#setup" className="text-slate-400 hover:text-white transition-colors">Setup Guide</a>
-              <button 
-                onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
+              <a 
+                href="#setup"
                 className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-semibold text-xs hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
               >
-                Launch Dashboard
-              </button>
+                Setup Guide
+              </a>
             </nav>
           </header>
 
@@ -372,18 +371,12 @@ export const App: React.FC = () => {
             </p>
 
             <div className="flex justify-center gap-4">
-              <button 
-                onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
-                className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
-              >
-                <Cpu size={16} />
-                Open Dashboard
-              </button>
               <a 
                 href="#setup"
-                className="px-6 py-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-semibold text-sm hover:bg-slate-800 hover:text-white active:scale-95 transition-all flex items-center gap-2"
+                className="px-8 py-3.5 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
               >
-                Get Started
+                <Cpu size={16} />
+                View Setup Guide
               </a>
             </div>
           </section>
