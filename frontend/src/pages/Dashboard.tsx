@@ -22,10 +22,10 @@ export const Dashboard: React.FC = () => {
   const statusStr = systemState?.status || 'idle';
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="w-full h-full">
       <Hero />
-      
-      <div className="max-w-[1800px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-20 -mt-10">
+
+      <div className="max-w-[1800px] w-full mx-auto px-6 pb-8 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-20">
         {/* Left Column (System Vitals & Roster) */}
         <section className="lg:col-span-3 flex flex-col gap-6">
           <div className="h-[420px]"><MetricsPanel /></div>

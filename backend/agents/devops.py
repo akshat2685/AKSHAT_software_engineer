@@ -10,7 +10,7 @@ class DevOpsAgent(EngineeringAgent):
     role = "devops"
 
     def determine_next_action(self, state: Any, objective: str) -> str:
-        return "Generate CI/CD pipelines, Infrastructure-as-Code, and publish artifact."
+        return "Execute advanced delivery pipeline (Build, Test, Scan, Package, Deploy, Monitor)."
 
     def select_tool(self, state: Any, action: str) -> tuple[str | None, Dict[str, Any]]:
         context = getattr(state, "agent_context", {}).get("DevOps", {})

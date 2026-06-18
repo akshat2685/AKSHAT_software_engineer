@@ -6,12 +6,13 @@ AKSHAT is a local-first autonomous software engineering company powered by multi
 
 ## 🚀 Core Features
 
-- **Multi-Agent Orchestration**: Enlists specialized agents (Project Manager, Architect, Developer, Tester, Deployer, Reviewer, and Memory) to build software sequentially.
+- **Multi-Agent Orchestration**: Enlists specialized agents (Project Manager, Architect, Developer, Tester, Deployer, Reviewer, Memory, **Debug**, **Refactor**, **Documentation**, **Dependency**, **Browser**, and **Vision**) to build software sequentially or concurrently.
 - **Relational Project History**: Stores registration details, project metadata, event timelines, and agent logs in a local relational database structure.
 - **Secure JWT Authentication**: Protects dashboard views and background REST/WebSocket routes using crypt password hashing and standard token encoding.
 - **Interactive Replay Timeline**: Step-by-step playback controls allow users to trace how prompts were analyzed, files generated, and builds verified.
 - **Offline-First & Fast Fallbacks**: Detects Ollama connection timeouts and caches them, gracefully falling back to cloud APIs (such as Groq or OpenAI) to keep prompts responsive.
 - **Intelligent Prompt Router**: Uses a model-based classification brain to determine if a prompt is a simple greeting or an engineering task.
+- **Governance & Recovery Engine**: Incorporates a strict multi-gate validation engine that halts execution if the generated code fails quality, security, or ethical benchmarks, while state snapshots allow for seamless recovery.
 
 ---
 

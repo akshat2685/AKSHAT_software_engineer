@@ -2,15 +2,32 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+
+# Create a temporary file for the test database and configure the environment
+temp_db_file = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False)
+temp_db_file.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{Path(temp_db_file.name).resolve().as_posix()}"
+
+# Mock chromadb entirely to avoid downloading models during tests
+mock_chromadb = MagicMock()
+mock_collection = MagicMock()
+mock_collection.count.return_value = 0
+mock_client = MagicMock()
+mock_client.get_or_create_collection.return_value = mock_collection
+mock_chromadb.PersistentClient.return_value = mock_client
+sys.modules['chromadb'] = mock_chromadb
 
 from backend.core import AkshatCore
-from backend.graph.workflow import PromptAnalyzer, WorkflowOrchestrator
+from backend.graph.workflow import WorkflowPatternsEngine, WorkflowOrchestrator
 from backend.runtime import EventBus, MemoryStore
 from backend.services.ollama_service import OllamaService
+from backend.database.connection import init_db
+init_db()
 
 
 class FakeToolRunner:
@@ -68,7 +85,7 @@ class FakeToolRunner:
 
 class WorkflowTests(unittest.TestCase):
     def test_prompt_analyzer_classifies_prompt_types(self) -> None:
-        analyzer = PromptAnalyzer()
+        analyzer = WorkflowPatternsEngine()
 
         self.assertEqual(analyzer.analyze("build a dashboard website").task_type, "website")
         self.assertEqual(analyzer.analyze("please deploy this release").task_type, "deploy")
@@ -88,8 +105,8 @@ class WorkflowTests(unittest.TestCase):
         state = orchestrator.run("task-1", "Build a website dashboard", [], {"summary": "repo"}, [], emit)
 
         self.assertEqual(state["task_type"], "website")
-        self.assertIn("Deploy", state["selected_agents"])
-        self.assertIn("Deploy", state["execution_order"])
+        self.assertIn("DevOps", state["selected_agents"])
+        self.assertIn("DevOps", state["execution_order"])
         self.assertEqual(state["deployment_status"], "published")
         self.assertTrue(state["deployment_url"].endswith("/deploy/" + state["artifact_name"]))
         self.assertTrue(state["artifact_history"])
@@ -141,7 +158,7 @@ class ChatRoutingTests(unittest.TestCase):
             response = core.chat("build a portfolio website")
 
         self.assertEqual(response["mode"], "workflow")
-        submit.assert_called_once_with("build a portfolio website")
+        submit.assert_called_once_with("build a portfolio website", workflow_pattern="Auto")
 
     @patch("backend.core.OllamaService.generate_response", return_value="")
     def test_website_artifact_creates_project_files(self, _mock_generate_response: object) -> None:
@@ -207,7 +224,7 @@ class CloudFallbackTests(unittest.TestCase):
         )
 
         with patch.object(service, "_generate_with_ollama", return_value=("", "timeout")):
-            with patch.object(service.cloud, "generate_response", return_value="cloud answer") as cloud_generate:
+            with patch.object(service.cloud, "generate", return_value="cloud answer") as cloud_generate:
                 response = service.generate_response("developer", "Explain the fallback chain")
 
         self.assertEqual(response, "cloud answer")

@@ -60,7 +60,7 @@ export const MetricsPanel: React.FC = () => {
           <div className="rounded-lg bg-slate-900/60 border border-line p-3 text-center flex flex-col justify-center">
             <div className="text-xs text-gray-400 font-display mb-1">Active Model</div>
             <div className="text-sm font-mono font-bold text-cyan">
-              GPT-4o
+              Gemini Flash
             </div>
           </div>
           <div className="rounded-lg bg-slate-900/60 border border-line p-3 text-center flex flex-col justify-center">

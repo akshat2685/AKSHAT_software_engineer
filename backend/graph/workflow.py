@@ -21,6 +21,18 @@ from backend.agents.performance import PerformanceAgent
 from backend.agents.compliance import ComplianceAgent
 from backend.agents.technical_writer import TechnicalWriterAgent
 from backend.agents.cost import CostAgent
+from backend.agents.debug import DebugAgent
+from backend.agents.refactor import RefactorAgent
+from backend.agents.documentation import DocumentationAgent
+from backend.agents.dependency import DependencyAgent
+from backend.agents.browser import BrowserAgent
+from backend.agents.vision import VisionAgent
+
+from backend.services.event_coordinator import event_bus
+from backend.services.observability_engine import observability_engine
+from backend.services.recovery_engine import recovery_engine
+from backend.services.reflection_engine import reflection_engine
+from backend.services.knowledge_engine import knowledge_engine
 
 AGENT_ORDER = [
     "ProjectManager",
@@ -157,6 +169,24 @@ class WorkflowPatternsEngine:
                     pipeline.insert(pipeline.index("Reviewer"), "TechnicalWriter")
                 else:
                     pipeline.append("TechnicalWriter")
+            if "Documentation" not in pipeline:
+                pipeline.append("Documentation")
+
+        if "bug" in text or "fix" in text or "debug" in text or "refactor" in text:
+            if "Debug" not in pipeline:
+                pipeline.append("Debug")
+            if "Refactor" not in pipeline:
+                pipeline.append("Refactor")
+
+        if "dependency" in text or "package" in text or "pip" in text or "npm" in text:
+            if "Dependency" not in pipeline:
+                pipeline.append("Dependency")
+
+        if "browser" in text or "ui" in text or "playwright" in text or "vision" in text or "see" in text:
+            if "Browser" not in pipeline:
+                pipeline.append("Browser")
+            if "Vision" not in pipeline:
+                pipeline.append("Vision")
         
         if "ToolsEngine" not in pipeline: pipeline.append("ToolsEngine")
         if "Memory" not in pipeline: pipeline.append("Memory")
@@ -307,6 +337,12 @@ class WorkflowOrchestrator:
             "compliance": ComplianceAgent(tool_runner),
             "technical_writer": TechnicalWriterAgent(tool_runner),
             "cost": CostAgent(tool_runner),
+            "debug": DebugAgent(tool_runner),
+            "refactor": RefactorAgent(tool_runner),
+            "documentation": DocumentationAgent(tool_runner),
+            "dependency": DependencyAgent(tool_runner),
+            "browser": BrowserAgent(tool_runner),
+            "vision": VisionAgent(tool_runner),
         }
 
     def run(
@@ -345,6 +381,10 @@ class WorkflowOrchestrator:
             self._run_pattern_a_sequential(state, emit)
         state.structured_result = self._build_completion(state)
         state.final_result = state.structured_result.get("summary", "")
+        try:
+            reflection_engine.trigger_reflection(prompt, state.to_dict())
+        except Exception:
+            pass
         return state.to_dict()
 
     def _run_pattern_a_sequential(self, state: WorkflowState, emit: Callable[[str, str, Dict[str, Any]], None]) -> None:
@@ -405,13 +445,19 @@ class WorkflowOrchestrator:
         if "Architect" in state.selected_agents: self._run_agent("architect", state, emit)
         if "UXFrontend" in state.selected_agents: self._run_agent("ux_frontend", state, emit)
         if "DataEngineer" in state.selected_agents: self._run_agent("data_engineer", state, emit)
+        if "Dependency" in state.selected_agents: self._run_agent("dependency", state, emit)
         if "Developer" in state.selected_agents: self._run_agent("developer", state, emit)
         if "Security" in state.selected_agents: self._run_agent("security", state, emit)
         if "Tester" in state.selected_agents: self._run_validation_loop(state, emit)
+        if "Debug" in state.selected_agents and not state.tests_passed: self._run_agent("debug", state, emit)
+        if "Refactor" in state.selected_agents: self._run_agent("refactor", state, emit)
         if "Performance" in state.selected_agents: self._run_agent("performance", state, emit)
         if "Compliance" in state.selected_agents: self._run_agent("compliance", state, emit)
         if "DevOps" in state.selected_agents and state.artifact_path: self._run_agent("devops", state, emit)
+        if "Browser" in state.selected_agents: self._run_agent("browser", state, emit)
+        if "Vision" in state.selected_agents: self._run_agent("vision", state, emit)
         if "TechnicalWriter" in state.selected_agents: self._run_agent("technical_writer", state, emit)
+        if "Documentation" in state.selected_agents: self._run_agent("documentation", state, emit)
         if "Reviewer" in state.selected_agents:
             if state.tests_passed or state.task_type in {"research", "general"} or state.deployment_status == "published":
                 self._run_agent("reviewer", state, emit)
@@ -444,6 +490,12 @@ class WorkflowOrchestrator:
             context["memory_engine_context"] = mem_result
         except Exception:
             pass
+
+        try:
+            org_context = knowledge_engine.retrieve(f"{label} task for {state.task_type}: {state.user_request}")
+            context["knowledge_engine_context"] = org_context
+        except Exception:
+            pass
             
         state.agent_context[label] = context
         
@@ -451,8 +503,38 @@ class WorkflowOrchestrator:
         max_retries = 2
         attempt = 0
         
+        import asyncio
+        def _pub(event_type, payload):
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(event_bus.publish(event_type, payload))
+                else:
+                    loop.run_until_complete(event_bus.publish(event_type, payload))
+            except Exception:
+                try:
+                    asyncio.run(event_bus.publish(event_type, payload))
+                except Exception:
+                    pass
+
+        _pub("TaskCreated" if name == "project_manager" else f"Agent{label}Started", {"project_id": state.project_id})
+        
         while attempt <= max_retries:
-            self.agents[name].run(state, emit)
+            import time
+            start_time = time.time()
+            try:
+                self.agents[name].run(state, emit)
+                success = True
+            except Exception as e:
+                success = False
+                _pub("BuildFailed", {"project_id": state.project_id, "error": str(e)})
+                raise e
+                
+            duration_ms = (time.time() - start_time) * 1000
+            try:
+                observability_engine.record_agent_execution(label, duration_ms, tokens_used=0, success=success)
+            except Exception:
+                pass
             
             output = state.agent_outputs.get(label, "")
             
@@ -500,6 +582,19 @@ class WorkflowOrchestrator:
                 print(f"[GOVERNANCE ENGINE] Error: {e}")
                 break
         
+        try:
+            recovery_engine.save_checkpoint(state.project_id, state.to_dict())
+        except Exception:
+            pass
+
+        output = state.agent_outputs.get(label, "")
+        if name in ["developer", "data_engineer", "ux_frontend"]:
+            _pub("CodeGenerated", {"project_id": state.project_id, "output": output})
+        elif name == "reviewer":
+            _pub("ReviewCompleted", {"project_id": state.project_id, "output": output})
+        elif name == "devops":
+            _pub("DeployFinished", {"project_id": state.project_id, "output": output})
+            
         try:
             output = state.agent_outputs.get(label, "")
             if output:

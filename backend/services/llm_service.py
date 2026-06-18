@@ -38,6 +38,7 @@ class LLMService:
     ) -> None:
         from backend.services.providers.ollama_provider import OllamaProvider
         from backend.services.providers.cloud_provider import CloudProvider
+        from backend.services.providers.gemini_provider import GeminiProvider
 
         # Load environment values or constructor args
         self.ollama_url = url or os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
@@ -64,12 +65,17 @@ class LLMService:
             fallback_val = os.environ.get("CLOUD_FALLBACK_ENABLED") or os.environ.get("AKSHAT_CLOUD_FALLBACK", "true")
             self.cloud_fallback_enabled = fallback_val.strip().lower() in {"1", "true", "yes", "y", "on", "enabled"}
 
+        # Gemini provider (native Google Generative AI)
+        self.gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        self.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash").strip()
+
         # DB Overrides
         self._load_db_settings()
 
         # Providers
         self.ollama_provider = OllamaProvider(self.ollama_url, self.ollama_model, self.ollama_timeout)
         self.cloud_provider = CloudProvider(self.cloud_url, self.cloud_model, self.cloud_key)
+        self.gemini_provider = GeminiProvider(self.gemini_key, self.gemini_model)
         self.cloud = self.cloud_provider
 
     def _load_db_settings(self):
@@ -135,12 +141,20 @@ class LLMService:
                 if res:
                     return res
             except Exception as e:
-                LOGGER.warning("Ollama generation failed: %s. Falling back to cloud...", e)
+                LOGGER.warning("Ollama generation failed: %s. Falling back...", e)
 
-        # 2. Try Cloud Fallback
+        # 2. Try Gemini (native Google AI)
+        if self.gemini_provider.is_ready():
+            try:
+                LOGGER.info("Using Gemini provider (%s)...", self.gemini_model)
+                return self.gemini_provider.generate(prompt, system_prompt, temperature, max_tokens)
+            except Exception as e:
+                LOGGER.warning("Gemini generation failed: %s. Trying cloud fallback...", e)
+
+        # 3. Try generic Cloud Fallback (OpenAI-compatible)
         if self.cloud_fallback_enabled and self.cloud_provider.is_ready():
             try:
-                LOGGER.info("Local Ollama unavailable or failed. Using Cloud Provider (%s)...", self.cloud_model)
+                LOGGER.info("Using Cloud Provider (%s)...", self.cloud_model)
                 return self.cloud_provider.generate(prompt, system_prompt, temperature, max_tokens)
             except Exception as e:
                 LOGGER.error("Cloud generation fallback also failed: %s", e)
@@ -150,16 +164,22 @@ class LLMService:
     def status(self) -> Dict[str, Any]:
         ollama_status = self.ollama_provider.get_status()
         cloud_status = self.cloud_provider.get_status()
+        gemini_status = self.gemini_provider.get_status()
         
-        ready = ollama_status.get("ready", False) or (self.cloud_fallback_enabled and cloud_status.get("ready", False))
+        ready = (
+            ollama_status.get("ready", False) or
+            gemini_status.get("ready", False) or
+            (self.cloud_fallback_enabled and cloud_status.get("ready", False))
+        )
         
-        # Build status message
         if ollama_status.get("ready"):
-            msg = "Ollama connected; cloud fallback available" if cloud_status.get("ready") else "Inference engine connected"
+            msg = "Ollama connected"
+        elif gemini_status.get("ready"):
+            msg = f"Gemini active ({self.gemini_model})"
         elif self.cloud_fallback_enabled and cloud_status.get("ready"):
-            msg = "Local Ollama offline; cloud fallback active"
+            msg = "Cloud fallback active"
         else:
-            msg = "No LLM provider available"
+            msg = "No LLM provider available — set GEMINI_API_KEY in .env"
 
         return {
             "provider": "Local inference engine",
@@ -167,6 +187,8 @@ class LLMService:
             "configured_model": self.ollama_model,
             "cloud_configured_model": self.cloud_model,
             "cloud_configured_url": self.cloud_url,
+            "gemini_model": self.gemini_model,
+            "gemini_ready": gemini_status.get("ready", False),
             "resolved_model": ollama_status.get("resolved_model", ""),
             "connected": ollama_status.get("connected", False),
             "installed": ollama_status.get("installed", False),
@@ -174,6 +196,7 @@ class LLMService:
             "ready": ready,
             "message": msg,
             "cloud": cloud_status,
+            "gemini": gemini_status,
         }
 
     def _get_system_prompt(self, role: str) -> str:
@@ -197,13 +220,19 @@ class LLMService:
     def generate_response(self, role: str, prompt: str) -> str:
         model = self.ollama_provider.resolve_model()
         ollama_text = ""
-        ollama_status = "model_unavailable"
         if model:
-            # Call the helper so it can be patched in tests
             ollama_text, ollama_status = self._generate_with_ollama(role, prompt, model, time.time())
             if ollama_text:
                 return ollama_text
         
+        # Try Gemini next
+        if self.gemini_provider.is_ready():
+            try:
+                sys_prompt = self._get_system_prompt(role)
+                return self.gemini_provider.generate(prompt=prompt, system_prompt=sys_prompt)
+            except Exception as e:
+                LOGGER.warning("Gemini generate_response failed: %s", e)
+
         # Fallback to cloud
         if self.cloud_fallback_enabled and self.cloud_provider.is_ready():
             sys_prompt = self._get_system_prompt(role)

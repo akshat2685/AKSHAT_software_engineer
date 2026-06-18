@@ -190,29 +190,65 @@ class SettingsUpdate(BaseModel):
 @router.get("/api/settings")
 def get_settings(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     from backend.database.models import SystemSettings
+    import os as _os
     db_url = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_url").first()
     db_key = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_key").first()
     db_model = db.query(SystemSettings).filter(SystemSettings.setting_key == "cloud_model").first()
-    
+    db_gemini = db.query(SystemSettings).filter(SystemSettings.setting_key == "gemini_key").first()
+    db_gemini_model = db.query(SystemSettings).filter(SystemSettings.setting_key == "gemini_model").first()
+
     url = db_url.setting_value if db_url else ""
     key = db_key.setting_value if db_key else ""
     model = db_model.setting_value if db_model else ""
-    
-    # Do not send the full key to the frontend for security, just whether it exists
+    gemini_key = db_gemini.setting_value if db_gemini else _os.environ.get("GEMINI_API_KEY", "")
+    gemini_model = db_gemini_model.setting_value if db_gemini_model else _os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+
     has_key = bool(key)
+    has_gemini = bool(gemini_key)
     masked_key = key[:4] + "..." + key[-4:] if key and len(key) > 8 else ("***" if key else "")
+    masked_gemini = gemini_key[:6] + "..." + gemini_key[-4:] if gemini_key and len(gemini_key) > 10 else ("***" if gemini_key else "")
 
     return {
         "cloud_url": url,
         "cloud_model": model,
         "has_key": has_key,
-        "masked_key": masked_key
+        "masked_key": masked_key,
+        "has_gemini": has_gemini,
+        "masked_gemini": masked_gemini,
+        "gemini_model": gemini_model,
     }
 
 @router.post("/api/settings")
-def update_settings(data: SettingsUpdate, current_user: dict = Depends(get_current_user)):
+def update_settings(data: SettingsUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     from backend.services.llm_service import _default_service
-    # If the frontend passes a dummy masked string, don't override the actual key
+    from backend.database.models import SystemSettings
+    import os as _os
+
+    def _upsert(key_name, val):
+        s = db.query(SystemSettings).filter(SystemSettings.setting_key == key_name).first()
+        if not s:
+            s = SystemSettings(setting_key=key_name)
+            db.add(s)
+        s.setting_value = val
+
+    # If the URL is a gemini:// scheme, treat cloud_key as a Gemini key
+    if data.cloud_url.startswith("gemini://"):
+        gemini_key = data.cloud_key if data.cloud_key and "..." not in data.cloud_key else ""
+        gemini_model = data.cloud_model or "gemini-1.5-flash"
+        if gemini_key:
+            _upsert("gemini_key", gemini_key)
+            _upsert("gemini_model", gemini_model)
+            db.commit()
+            # Update the running provider
+            from backend.services.providers.gemini_provider import GeminiProvider
+            _default_service.gemini_key = gemini_key
+            _default_service.gemini_model = gemini_model
+            _default_service.gemini_provider = GeminiProvider(gemini_key, gemini_model)
+            _os.environ["GEMINI_API_KEY"] = gemini_key
+            _os.environ["GEMINI_MODEL"] = gemini_model
+        return {"status": "success", "provider": "gemini"}
+
+    # Otherwise treat as OpenAI-compatible cloud
     actual_key = data.cloud_key if data.cloud_key and not data.cloud_key.startswith("***") and "..." not in data.cloud_key else ""
     _default_service.update_config(data.cloud_url, actual_key, data.cloud_model)
-    return {"status": "success"}
+    return {"status": "success", "provider": "cloud"}

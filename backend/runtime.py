@@ -116,18 +116,33 @@ class EventBus:
 
 class MemoryStore:
     def __init__(self, path: Path):
-        from backend.database.connection import init_db, SessionLocal
-        init_db()
-        self.SessionLocal = SessionLocal
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from backend.database.connection import Base
+        from backend.database import models
+
+        db_url = f"sqlite:///{path.resolve()}"
+        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        Base.metadata.create_all(bind=self.engine)
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
     def add(self, kind: str, prompt: str, summary: str, payload: Dict[str, Any]) -> None:
+        import uuid
         from backend.database.models import Memory
         db = self.SessionLocal()
         try:
             outcome = payload.get("outcome", "")
             if not outcome and isinstance(payload, dict):
                 outcome = json.dumps(payload)
-            entry = Memory(problem=prompt, solution=summary, outcome=outcome, tags=kind)
+            content_data = {"problem": prompt, "solution": summary}
+            entry = Memory(
+                id=str(uuid.uuid4()),
+                memory_type=kind,
+                content=json.dumps(content_data),
+                source_agent=payload.get("source_agent", "MemoryStore"),
+                outcome=str(outcome),
+                tags=kind
+            )
             db.add(entry)
             db.commit()
         finally:
@@ -139,18 +154,26 @@ class MemoryStore:
         try:
             q = f"%{query.lower()}%"
             rows = db.query(Memory).filter(
-                (Memory.problem.ilike(q)) | (Memory.solution.ilike(q)) | (Memory.outcome.ilike(q))
-            ).order_by(Memory.id.desc()).limit(limit).all()
-            return [
-                {
-                    "created_at": row.created_at.isoformat(),
-                    "kind": row.tags,
-                    "prompt": row.problem,
-                    "summary": row.solution,
+                (Memory.content.ilike(q)) | (Memory.tags.ilike(q)) | (Memory.outcome.ilike(q))
+            ).order_by(Memory.created_at.desc()).limit(limit).all()
+            
+            results = []
+            for row in rows:
+                try:
+                    content_data = json.loads(row.content)
+                    problem = content_data.get("problem", "")
+                    solution = content_data.get("solution", "")
+                except Exception:
+                    problem = row.content
+                    solution = ""
+                results.append({
+                    "created_at": row.created_at.isoformat() if row.created_at else "",
+                    "kind": row.memory_type,
+                    "prompt": problem,
+                    "summary": solution,
                     "payload": {"outcome": row.outcome},
-                }
-                for row in rows
-            ]
+                })
+            return results
         finally:
             db.close()
 
@@ -158,48 +181,65 @@ class MemoryStore:
         from backend.database.models import Memory
         db = self.SessionLocal()
         try:
-            rows = db.query(Memory).order_by(Memory.id.desc()).limit(limit).all()
-            return [
-                {
-                    "created_at": row.created_at.isoformat(),
-                    "kind": row.tags,
-                    "prompt": row.problem,
-                    "summary": row.solution,
+            rows = db.query(Memory).order_by(Memory.created_at.desc()).limit(limit).all()
+            results = []
+            for row in rows:
+                try:
+                    content_data = json.loads(row.content)
+                    problem = content_data.get("problem", "")
+                    solution = content_data.get("solution", "")
+                except Exception:
+                    problem = row.content
+                    solution = ""
+                results.append({
+                    "created_at": row.created_at.isoformat() if row.created_at else "",
+                    "kind": row.memory_type,
+                    "prompt": problem,
+                    "summary": solution,
                     "payload": {"outcome": row.outcome},
-                }
-                for row in rows
-            ]
+                })
+            return results
         finally:
             db.close()
 
     def add_habit(self, kind: str, pattern: str, confidence: float, evidence: Dict[str, Any]) -> None:
-        # Habits are mapped to Memory with tags="habit"
         self.add("habit", pattern, f"Confidence: {confidence}", {"kind": kind, "evidence": evidence})
 
     def recent_habits(self, limit: int = 20) -> List[Dict[str, Any]]:
         from backend.database.models import Memory
         db = self.SessionLocal()
         try:
-            rows = db.query(Memory).filter(Memory.tags == "habit").order_by(Memory.id.desc()).limit(limit).all()
-            return [
-                {
-                    "created_at": row.created_at.isoformat(),
+            rows = db.query(Memory).filter(Memory.memory_type == "habit").order_by(Memory.created_at.desc()).limit(limit).all()
+            results = []
+            for row in rows:
+                try:
+                    content_data = json.loads(row.content)
+                    pattern = content_data.get("problem", "")
+                except Exception:
+                    pattern = row.content
+                results.append({
+                    "created_at": row.created_at.isoformat() if row.created_at else "",
                     "kind": "habit",
-                    "pattern": row.problem,
-                    "confidence": 0.9, # fallback
+                    "pattern": pattern,
+                    "confidence": 0.9,
                     "evidence": {"outcome": row.outcome},
-                }
-                for row in rows
-            ]
+                })
+            return results
         finally:
             db.close()
 
     def add_tool_log(self, agent_name: str, tool_name: str, reason: str, parameters: Dict[str, Any], result: Dict[str, Any]) -> None:
-        from backend.database.models import AgentRun
+        from backend.database.models import AgentRun, Project
         db = self.SessionLocal()
         try:
-            # Look up or mock active project ID
             project_id = parameters.get("project_id", "idle")
+            # Ensure project exists to satisfy foreign key constraint if enabled
+            proj = db.query(Project).filter(Project.id == project_id).first()
+            if not proj:
+                proj = Project(id=project_id, user_id=1, name="Default Project", status="active")
+                db.add(proj)
+                db.commit()
+            
             run = AgentRun(
                 project_id=project_id,
                 agent=agent_name,
@@ -221,7 +261,7 @@ class MemoryStore:
             rows = db.query(AgentRun).order_by(AgentRun.id.desc()).limit(limit).all()
             return [
                 {
-                    "created_at": row.created_at.isoformat(),
+                    "created_at": row.created_at.isoformat() if row.created_at else "",
                     "agent_name": row.agent,
                     "tool_name": row.action.split(":")[0] if ":" in row.action else row.action,
                     "reason": row.action.split(":", 1)[1].strip() if ":" in row.action else "",
