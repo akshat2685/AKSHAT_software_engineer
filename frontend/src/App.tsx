@@ -321,7 +321,7 @@ export const App: React.FC = () => {
   // --- VIEW 1: LANDING PAGE ---
   if (viewMode === 'landing') {
     return (
-      <div className="relative min-h-screen text-foreground overflow-hidden">
+      <div className="relative min-h-screen text-foreground overflow-y-auto">
         {/* Animated Background Blobs */}
         <div className="blob-bg blob-1"></div>
         <div className="blob-bg blob-2"></div>
