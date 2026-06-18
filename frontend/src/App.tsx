@@ -68,8 +68,9 @@ export const App: React.FC = () => {
     setSettingsOpen
   } = useStore();
 
-  // Navigation state (landing page vs functional app dashboard)
-  const [viewMode, setViewMode] = useState<'landing' | 'app'>('landing');
+  // Determine initial view based on hostname
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const [viewMode, setViewMode] = useState<'landing' | 'app'>(isLocalhost ? 'app' : 'landing');
 
   // Auth local state
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -354,7 +355,7 @@ export const App: React.FC = () => {
                 GitHub
               </a>
               <button 
-                onClick={() => setViewMode('app')}
+                onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
                 className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-white font-semibold text-xs hover:brightness-110 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
               >
                 Launch App
@@ -384,7 +385,7 @@ export const App: React.FC = () => {
               </p>
 
               <button 
-                onClick={() => setViewMode('app')}
+                onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
                 className="mb-8 px-6 py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-white font-bold hover:scale-102 hover:brightness-110 active:scale-98 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
               >
                 <Cpu size={16} />
