@@ -17,7 +17,6 @@ import {
   Check, 
   Shield, 
   Chrome, 
-  Cpu, 
   RefreshCw, 
   ExternalLink,
   Home
@@ -343,12 +342,7 @@ export const App: React.FC = () => {
             
             <nav className="flex items-center gap-6 text-sm">
               <a href="#features" className="text-slate-400 hover:text-white transition-colors">Features</a>
-              <a 
-                href="#setup"
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-semibold text-xs hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-              >
-                Setup Guide
-              </a>
+              <a href="#setup" className="text-slate-400 hover:text-white transition-colors">Setup Guide</a>
             </nav>
           </header>
 
@@ -366,19 +360,9 @@ export const App: React.FC = () => {
               </span>
             </h1>
             
-            <p className="text-base sm:text-lg text-slate-400 leading-relaxed mb-8 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
               AKSHAT is an autonomous workspace daemon that runs locally on your machine, monitors your git repositories, executes builds, runs unit tests, and integrates summaries directly to your developer profiles.
             </p>
-
-            <div className="flex justify-center gap-4">
-              <a 
-                href="#setup"
-                className="px-8 py-3.5 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
-              >
-                <Cpu size={16} />
-                View Setup Guide
-              </a>
-            </div>
           </section>
 
           {/* Quick Start Installation Block */}
