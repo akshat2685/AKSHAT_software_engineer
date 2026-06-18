@@ -1,13 +1,7 @@
 {
-  "name": "akshat-software-engineer",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
+  "name": "akshat-agent-deployment",
+  "version": "1.0.0",
   "scripts": {
-    "start": "py src/akshat_fastapi.py",
-    "frontend:build": "npm run build --prefix frontend",
-    "frontend:dev": "npm run dev --prefix frontend",
-    "build": "py -m compileall -q src backend",
-    "test": "python -m unittest discover -s test -p \"test_*.py\""
+    "vercel-build": "cd frontend && npm install && npm run build && cd .. && cp -r frontend/dist ./dist"
   }
 }
