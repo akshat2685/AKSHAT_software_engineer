@@ -15,13 +15,10 @@ import {
   Settings,
   Copy, 
   Check, 
-  Terminal as TerminalIcon, 
   Shield, 
-  Database, 
   Chrome, 
   Cpu, 
   RefreshCw, 
-  Github,
   ExternalLink,
   Home
 } from 'lucide-react';
@@ -321,91 +318,98 @@ export const App: React.FC = () => {
   // --- VIEW 1: LANDING PAGE ---
   if (viewMode === 'landing') {
     return (
-      <div className="relative min-h-screen text-foreground overflow-y-auto">
-        {/* Animated Background Blobs */}
-        <div className="blob-bg blob-1"></div>
-        <div className="blob-bg blob-2"></div>
+      <div className="relative min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-white pb-16">
+        {/* Soft Ambient Background Glows */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
+        <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-violet-500/10 rounded-full blur-[140px] pointer-events-none z-0"></div>
+        <div className="absolute bottom-10 left-10 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
 
-        {/* Main Content Wrapper */}
-        <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8 flex flex-col min-h-screen">
+        {/* Outer content container */}
+        <div className="relative z-10 max-w-6xl mx-auto px-6 flex flex-col">
           
-          {/* Navbar */}
-          <header className="py-6 flex items-center justify-between border-b border-white/10 animate-fade-in-up">
+          {/* Elegant Navbar */}
+          <header className="flex items-center justify-between py-6 border-b border-slate-800/80 mb-12">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-extrabold shadow-[0_0_20px_rgba(59,130,246,0.4)]">
                 A
               </div>
-              <span className="font-display text-xl font-bold tracking-tight text-white">
-                AKSHAT<span className="text-white/50 font-normal"> / AGENT</span>
+              <span className="font-semibold text-lg tracking-tight text-white font-display">
+                AKSHAT <span className="text-slate-500 font-normal">/ AGENT</span>
               </span>
-              <span className="ml-2 rounded-full bg-primary/20 border border-primary/30 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full">
                 v1.2.0
               </span>
             </div>
             
-            <nav className="flex items-center gap-4 md:gap-8 font-medium text-sm text-slate-300">
-              <a href="#features" className="hover:text-white transition-colors hidden sm:inline-block">Features</a>
-              <a 
-                href="https://github.com/akshat2685/AKSHAT_software_engineer" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="items-center gap-2 hover:text-white transition-colors hidden sm:flex"
-              >
-                <Github size={16} />
-                GitHub
-              </a>
+            <nav className="flex items-center gap-6 text-sm">
+              <a href="#features" className="text-slate-400 hover:text-white transition-colors">Features</a>
+              <a href="#setup" className="text-slate-400 hover:text-white transition-colors">Setup Guide</a>
               <button 
                 onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-accent text-white font-semibold text-xs hover:brightness-110 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-semibold text-xs hover:brightness-110 active:scale-95 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
               >
-                Launch App
+                Launch Dashboard
               </button>
             </nav>
           </header>
 
-          {/* Hero Section */}
-          <section className="flex flex-col lg:flex-row items-center justify-between py-20 gap-16 lg:gap-8 flex-1 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          {/* Hero & Intro Section */}
+          <section className="text-center max-w-3xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/5 px-3.5 py-1 text-xs font-semibold text-blue-400 mb-6 backdrop-blur-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+              Local-First AI Software Engineer
+            </div>
             
-            {/* Left: Text & CTA */}
-            <div className="lg:w-1/2 flex flex-col items-start">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300 mb-6 backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                Local-First & Open Source
-              </div>
-              
-              <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white leading-[1.1] mb-6">
-                The Agent That <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent text-glow">
-                  Lives in Your Workspace.
-                </span>
-              </h1>
-              
-              <p className="text-lg text-slate-400 font-body leading-relaxed max-w-xl mb-8">
-                Not an IDE-tethered copilot or a simple API wrapper. AKSHAT is an autonomous workspace daemon that runs locally on your machine, continuously monitors your repositories, deploys static bundles, and updates your professional profile.
-              </p>
+            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white mb-6 leading-tight font-display">
+              The Agent That Lives <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-violet-400 to-indigo-400">
+                Inside Your Workspace.
+              </span>
+            </h1>
+            
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed mb-8 max-w-2xl mx-auto">
+              AKSHAT is an autonomous workspace daemon that runs locally on your machine, monitors your git repositories, executes builds, runs unit tests, and integrates summaries directly to your developer profiles.
+            </p>
 
+            <div className="flex justify-center gap-4">
               <button 
                 onClick={() => isLocalhost ? setViewMode('app') : (window.location.href = 'http://127.0.0.1:3000')}
-                className="mb-8 px-6 py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-white font-bold hover:scale-102 hover:brightness-110 active:scale-98 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+                className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
               >
                 <Cpu size={16} />
-                Open Agent Dashboard
+                Open Dashboard
               </button>
-              
-              {/* Glass Setup Block */}
-              <div className="w-full max-w-lg glass-panel rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-semibold text-slate-300">Quick Start</span>
-                  <div className="flex bg-slate-900/50 rounded-lg p-1 border border-white/5">
+              <a 
+                href="#setup"
+                className="px-6 py-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-semibold text-sm hover:bg-slate-800 hover:text-white active:scale-95 transition-all flex items-center gap-2"
+              >
+                Get Started
+              </a>
+            </div>
+          </section>
+
+          {/* Quick Start Installation Block */}
+          <section id="setup" className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-24 items-start">
+            {/* Left side: Guide description and installation tab */}
+            <div className="lg:col-span-5 flex flex-col justify-center">
+              <h2 className="text-2xl font-bold text-white mb-4">Quick Start Setup</h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                AKSHAT runs directly in your local terminal. Run the daemon on your PC, and connect it with the live client dashboard to watch tasks execute.
+              </p>
+
+              <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-xl p-5 backdrop-blur-md">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Installation commands</span>
+                  <div className="flex bg-slate-900/80 rounded-lg p-0.5 border border-slate-800">
                     <button 
                       onClick={() => setOsTab('unix')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${osTab === 'unix' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${osTab === 'unix' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
                     >
                       macOS / Linux
                     </button>
                     <button 
                       onClick={() => setOsTab('windows')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${osTab === 'windows' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${osTab === 'windows' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
                     >
                       Windows
                     </button>
@@ -414,175 +418,116 @@ export const App: React.FC = () => {
 
                 {/* Step 1 */}
                 <div className="mb-4">
-                  <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
-                    <span>1. Clone & Navigate</span>
-                    <button onClick={() => handleCopy(installCmd, 1)} className="hover:text-primary transition-colors flex items-center gap-1">
-                      {copiedStep === 1 ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                  <div className="flex justify-between items-center text-xs text-slate-400 mb-1.5">
+                    <span>1. Clone Repository</span>
+                    <button onClick={() => handleCopy(installCmd, 1)} className="text-slate-500 hover:text-blue-400 transition-colors">
+                      {copiedStep === 1 ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <div className="bg-slate-950/80 border border-white/5 rounded-lg p-3 overflow-x-auto font-mono text-sm text-slate-300">
+                  <div className="bg-slate-950 border border-slate-800/60 rounded-lg p-3 overflow-x-auto font-mono text-xs text-slate-300">
                     <code>{installCmd}</code>
                   </div>
                 </div>
 
                 {/* Step 2 */}
                 <div>
-                  <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
-                    <span>2. Bootstrap Daemon</span>
-                    <button onClick={() => handleCopy(configureCmd, 2)} className="hover:text-primary transition-colors flex items-center gap-1">
-                      {copiedStep === 2 ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                  <div className="flex justify-between items-center text-xs text-slate-400 mb-1.5">
+                    <span>2. Start Workspace Daemon</span>
+                    <button onClick={() => handleCopy(configureCmd, 2)} className="text-slate-500 hover:text-blue-400 transition-colors">
+                      {copiedStep === 2 ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <div className="bg-slate-950/80 border border-white/5 rounded-lg p-3 overflow-x-auto font-mono text-sm text-slate-300">
+                  <div className="bg-slate-950 border border-slate-800/60 rounded-lg p-3 overflow-x-auto font-mono text-xs text-slate-300">
                     <code>{configureCmd}</code>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Modern Terminal */}
-            <div className="lg:w-1/2 w-full max-w-2xl mt-10 lg:mt-0">
-              <div className="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/10 flex flex-col h-[450px]">
-                {/* Terminal Header with Non-overlapping 3-column layout */}
-                <div className="bg-slate-900/80 border-b border-white/5 px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 w-16">
-                    <span className="mac-btn mac-close"></span>
-                    <span className="mac-btn mac-minimize"></span>
-                    <span className="mac-btn mac-maximize"></span>
+            {/* Right side: Mock terminal preview */}
+            <div className="lg:col-span-7">
+              <div className="bg-[#0b0f19] border border-slate-800 rounded-xl overflow-hidden shadow-2xl flex flex-col h-[380px]">
+                {/* Header */}
+                <div className="bg-[#070b13] px-4 py-3 flex items-center justify-between border-b border-slate-900">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-rose-500/80"></span>
+                    <span className="w-3 h-3 rounded-full bg-amber-500/80"></span>
+                    <span className="w-3 h-3 rounded-full bg-emerald-500/80"></span>
                   </div>
-                  <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
-                    <TerminalIcon size={14} /> akshat@workspace:~
-                  </div>
-                  <div className="w-16"></div>
+                  <span className="text-[11px] font-mono text-slate-500">akshat@workspace:~</span>
+                  <div className="w-12"></div>
                 </div>
-
-                {/* Terminal Body */}
-                <div className="flex-1 p-5 font-mono text-sm leading-relaxed overflow-y-auto bg-slate-950/50">
-                  {terminalLines.map((line, idx) => {
-                    const isCmd = line.startsWith('akshat@local');
-                    const isError = line.includes('[ERROR]');
-                    const isSystem = line.includes('[SYSTEM]');
-                    const isScraper = line.includes('[SCRAPER]');
-                    const isDev = line.includes('[DEVELOPER]') || line.includes('[TESTER]');
-                    
-                    let colorClass = 'text-slate-300';
-                    if (isCmd) colorClass = 'text-primary font-bold';
-                    else if (isError) colorClass = 'text-red-400';
-                    else if (isSystem) colorClass = 'text-cyan-400';
-                    else if (isScraper) colorClass = 'text-amber-400';
-                    else if (isDev) colorClass = 'text-green-400';
-
-                    return (
-                      <div key={idx} className={`${colorClass} whitespace-pre-wrap break-all mb-1`}>
-                        {line}
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Currently typing line */}
-                  {currentLineIndex < TERMINAL_LOGS.length && (
-                    <div className={`${TERMINAL_LOGS[currentLineIndex].text.startsWith('akshat@local') ? 'text-primary font-bold' : 'text-slate-300'} whitespace-pre-wrap break-all`}>
-                      {typedText}
-                      <span className="blink inline-block w-[1.2ch] h-[1.1em] bg-white/80 align-middle ml-1 rounded-sm" />
-                    </div>
-                  )}
-                  
-                  {currentLineIndex >= TERMINAL_LOGS.length && (
-                    <div className="text-slate-500 italic text-xs mt-4">
-                      Simulation finished. Restarting in 4s...
-                      <span className="blink inline-block w-[1.2ch] h-[1.1em] bg-slate-500/50 align-middle ml-1 rounded-sm" />
-                    </div>
-                  )}
-                  <div ref={terminalBottomRef} />
+                
+                {/* Simulated Logs */}
+                <div className="flex-1 p-5 font-mono text-xs leading-relaxed overflow-y-auto text-slate-400 bg-[#040810]/50 space-y-1.5 select-none">
+                  <div className="text-blue-400 font-semibold">akshat@local:~ $ akshat run --continuous</div>
+                  <div className="text-cyan-500">[SYSTEM] Initializing AKSHAT Software Engineer Daemon...</div>
+                  <div className="text-cyan-500">[SYSTEM] Loading Gemini 3.5 Flash Reasoning Engine...</div>
+                  <div className="text-slate-500">[MONITOR] File watcher active on directory: C:/Users/workspace</div>
+                  <div className="text-slate-400">[MONITOR] Detected 3 modified files in branch "feat-ui-redesign"</div>
+                  <div className="text-slate-300">[PLANNER] Flow: [Build Front] → [Run Tests] → [Commit & Push]</div>
+                  <div className="text-emerald-400">[DEVELOPER] Running build & unit-tests locally...</div>
+                  <div className="text-emerald-400">[TESTER] 6 tests executed. Results: 100% SUCCESS.</div>
+                  <div className="text-indigo-400">[INTEGRATOR] Auto-commited "fix: solve scroll issues on UI container"</div>
+                  <div className="text-indigo-400">[INTEGRATOR] Successfully pushed changes to GitHub origin/master.</div>
+                  <div className="text-cyan-500">[SYSTEM] Task completed. Entering background watch mode...</div>
+                  <div className="text-slate-600 animate-pulse font-bold">akshat@local:~ $ monitoring workspace... █</div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Features Section */}
-          <section id="features" className="py-24 border-t border-white/5 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          {/* Features Grid */}
+          <section id="features" className="py-12 border-t border-slate-800/80">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Autonomous Capabilities</h2>
-              <p className="text-slate-400 max-w-2xl mx-auto">Everything you need for an AI developer that continuously works in the background.</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">Core Features</h2>
+              <p className="text-slate-400 text-sm max-w-xl mx-auto">Fully local engineering daemon built with complete security and autonomy.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Feature 1 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Shield className="text-blue-400" size={24} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
+                  <Shield className="text-blue-400" size={20} />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Local-First Security</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Your credentials, private API tokens, session cookies, and git history remain securely on your local file system. Never uploads private keys to the cloud.
+                <h3 className="text-base font-bold text-white mb-2">Local-First Security</h3>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Your code base, API keys, credentials, and databases remain strictly on your machine. Zero code telemetry or secret uploading to external servers.
                 </p>
               </div>
 
-              {/* Feature 2 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <RefreshCw className="text-emerald-400" size={24} />
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-6 hover:border-violet-500/30 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center mb-4">
+                  <RefreshCw className="text-violet-400" size={20} />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Git Monitor Daemon</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  A background file watcher scans local git branches, reads modified files, structures logical updates, and logs weekly summaries directly to your profile.
+                <h3 className="text-base font-bold text-white mb-2">Continuous Repository Monitor</h3>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  A local daemon watches repository edits, summarizes developments, runs test suites, builds production assets, and synchronizes status updates.
                 </p>
               </div>
 
-              {/* Feature 3 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Chrome className="text-amber-400" size={24} />
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-6 hover:border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4">
+                  <Chrome className="text-emerald-400" size={20} />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Profile Syncer</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Leverages custom Playwright instances to securely copy browser profiles. Bypass auth-walls to synchronize your workspace developments with LinkedIn.
-                </p>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Cpu className="text-purple-400" size={24} />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Gemini Reasoning</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Powered by Gemini 3.5 Flash. Rapidly generates commit messages, details architectural designs, parses developer events, and analyzes logs efficiently.
-                </p>
-              </div>
-
-              {/* Feature 5 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <TerminalIcon className="text-cyan-400" size={24} />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Self-Healing Deploys</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Validates the workspace frontend builds, verifies local unit test suites, fixes compilation warnings, and commits stable files without human intervention.
-                </p>
-              </div>
-
-              {/* Feature 6 */}
-              <div className="glass-card rounded-2xl p-8 group">
-                <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Database className="text-rose-400" size={24} />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Zero Admin Task</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Registers background daemons seamlessly as non-elevated Windows Startup tasks, allowing offline execution without needing persistent root privileges.
+                <h3 className="text-base font-bold text-white mb-2">Platform Profile Syncer</h3>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Utilizes local cookie storage and Playwright automation to securely synchronize engineering status logs to your professional LinkedIn updates.
                 </p>
               </div>
             </div>
           </section>
 
-          {/* Footer */}
-          <footer className="mt-auto py-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-            <p>© 2026 AKSHAT Agent. Released under MIT License.</p>
-            <div className="flex items-center gap-6">
-              <a href="https://github.com/akshat2685/AKSHAT_software_engineer" className="hover:text-white transition-colors flex items-center gap-1">
-                GitHub <ExternalLink size={14} />
-              </a>
-            </div>
+          {/* Simple Footer */}
+          <footer className="mt-20 pt-8 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <p>© 2026 AKSHAT Agent. Released under the MIT License.</p>
+            <a 
+              href="https://github.com/akshat2685/AKSHAT_software_engineer" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors flex items-center gap-1.5"
+            >
+              GitHub Repository <ExternalLink size={12} />
+            </a>
           </footer>
         </div>
       </div>
