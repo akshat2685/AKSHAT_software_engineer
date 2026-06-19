@@ -37,22 +37,29 @@ AKSHAT is a local-first autonomous software engineering company powered by multi
 ```text
 AKSHAT_software_engineer/
 ├── backend/
-│   ├── agents/            # Worker agents (PM, Dev, Tester, Deploy, Review, etc.)
-│   ├── api/               # REST API endpoints & JWT authentication routes
-│   ├── database/          # Connection manager and SQLAlchemy models
-│   ├── graph/             # LangGraph state machine orchestrator
-│   └── services/          # LLM router and Ollama/Cloud providers
+│   ├── alembic.ini        # Database migrations configuration
+│   ├── app/
+│   │   ├── api/           # Versioned REST API routes
+│   │   ├── models/        # SQLAlchemy database models
+│   │   ├── schemas/       # Pydantic validation models
+│   │   ├── utils/         # Logging, retry, and helpers
+│   │   ├── config.py      # Pydantic settings config
+│   │   ├── exceptions.py  # Custom application exceptions
+│   │   ├── middleware.py  # FastAPI middleware (logging, errors, tracking)
+│   │   └── main.py        # FastAPI server entrypoint
+│   ├── migrations/        # Alembic schema migrations
+│   ├── tests/             # Pytest suite
+│   └── ...
 ├── frontend/              # React dashboard SPA code
-│   ├── src/
-│   │   ├── components/    # Isolated UI panels (AgentFeed, metrics, explorer)
-│   │   ├── pages/         # Dashboard, Projects list, and Replay Timeline
-│   │   ├── services/      # HTTP and WebSocket clients
-│   │   └── stores/        # Zustand project store
+│   └── src/
+│       ├── components/    # Isolated UI panels (AgentFeed, metrics, explorer)
+│       ├── pages/         # Dashboard, Projects list, and Replay Timeline
+│       ├── services/      # HTTP and WebSocket clients
+│       └── stores/        # Zustand project store
 ├── workspace/             # Dedicated workspace directory (Local user files)
 │   ├── projects/          # Autonomously built software project outputs
 │   └── memory/            # SQLite memories database (akshat_memory.sqlite3)
-└── src/
-    └── akshat_fastapi.py  # Application startup server entrypoint
+└── .env                   # Environment secrets and config
 ```
 
 ---
@@ -63,13 +70,10 @@ AKSHAT_software_engineer/
 Ensure you have Python 3.12+ and Node.js installed.
 
 ### 2. Configure Environment
-Set up your local model and API credentials in your terminal:
+Copy the example environment file and fill in your secrets:
 ```bash
-# Set Cloud API key (Groq, OpenAI, etc.)
-export CLOUD_API_KEY="your_api_key_here"
-
-# Configure local Ollama model if available
-export OLLAMA_MODEL="free01/gemma4:e4b"
+cp .env.example .env
+# Edit .env with your LLM API keys and JWT secret
 ```
 
 ### 3. Backend Setup
@@ -78,9 +82,18 @@ Install the python requirements:
 pip install -r requirements.txt
 ```
 
+Initialize your database with Alembic:
+```bash
+cd backend
+alembic revision --autogenerate -m "Initial schema"
+alembic upgrade head
+cd ..
+```
+
 Run the backend server:
 ```bash
-python src/akshat_fastapi.py
+cd backend
+uvicorn app.main:app --reload --host 127.0.0.1 --port 3000
 ```
 The server will start at `http://127.0.0.1:3000/`.
 
