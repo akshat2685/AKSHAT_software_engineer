@@ -34,6 +34,14 @@ from backend.services.recovery_engine import recovery_engine
 from backend.services.reflection_engine import reflection_engine
 from backend.services.knowledge_engine import knowledge_engine
 
+# Production safeguards (Issue 1): iteration budget + wall-clock timeout.
+# Imported lazily-safe: these are pure-Python with no external deps.
+from backend.app.utils.safeguards import (
+    BudgetExceeded,
+    WorkflowGuardrails,
+    WorkflowTimeoutError,
+)
+
 AGENT_ORDER = [
     "ProjectManager",
     "Architect",
@@ -319,6 +327,7 @@ class WorkflowOrchestrator:
         self.llm = llm
         self.tool_runner = tool_runner
         self.analyzer = WorkflowPatternsEngine()
+        self.guardrails = WorkflowGuardrails.from_settings()
         self.agents = {
             "project_manager": ProjectManagerAgent(tool_runner),
             "architect": ArchitectAgent(tool_runner),
@@ -355,30 +364,50 @@ class WorkflowOrchestrator:
         emit: Callable[[str, str, Dict[str, Any]], None],
         workflow_pattern: str = "Auto",
     ) -> Dict[str, Any]:
+        # Reset per-run safeguards (Issue 1): iteration budget + wall-clock timeout.
+        self.guardrails.budget.reset()
         state = WorkflowState(
             project_id=project_id,
             user_request=prompt,
             memory_context=memory_context + habits,
         )
-        analysis = self.analyzer.analyze(prompt, workflow_pattern)
-        state.task_type = analysis.task_type
-        state.prompt_analysis = analysis.to_dict()
-        state.selected_agents = list(analysis.selected_agents)
-        state.execution_order = []
-        state.workflow_engine = analysis.workflow_pattern
-        state.artifact_name = self._artifact_name(prompt)
-        state.artifact_version = self._artifact_version()
-        state.agent_context = self._build_agent_context(state, analysis, repo)
-        emit("workflow", f"Pattern {analysis.workflow_pattern} selected for {state.task_type}", {"analysis": state.prompt_analysis})
-        
-        if analysis.workflow_pattern == "B":
-            self._run_pattern_b_parallel_swarm(state, emit)
-        elif analysis.workflow_pattern == "C":
-            self._run_pattern_c_adversarial(state, emit, analysis.max_loops)
-        elif analysis.workflow_pattern == "E":
-            self._run_pattern_e_hotfix(state, emit)
-        else:
-            self._run_pattern_a_sequential(state, emit)
+        try:
+            with self.guardrails.timeout:
+                analysis = self.analyzer.analyze(prompt, workflow_pattern)
+                state.task_type = analysis.task_type
+                state.prompt_analysis = analysis.to_dict()
+                state.selected_agents = list(analysis.selected_agents)
+                state.execution_order = []
+                state.workflow_engine = analysis.workflow_pattern
+                state.artifact_name = self._artifact_name(prompt)
+                state.artifact_version = self._artifact_version()
+                state.agent_context = self._build_agent_context(state, analysis, repo)
+                emit("workflow", f"Pattern {analysis.workflow_pattern} selected for {state.task_type}", {"analysis": state.prompt_analysis})
+
+                if analysis.workflow_pattern == "B":
+                    self._run_pattern_b_parallel_swarm(state, emit)
+                elif analysis.workflow_pattern == "C":
+                    self._run_pattern_c_adversarial(state, emit, analysis.max_loops)
+                elif analysis.workflow_pattern == "E":
+                    self._run_pattern_e_hotfix(state, emit)
+                else:
+                    self._run_pattern_a_sequential(state, emit)
+        except WorkflowTimeoutError:
+            emit("error", f"Workflow aborted: exceeded {self.guardrails.timeout.seconds}s timeout.", {})
+            state.structured_result = self._build_completion(state)
+            state.structured_result["status"] = "timeout"
+            state.structured_result["abort_reason"] = "WORKFLOW_TIMEOUT"
+            recovery_engine.save_checkpoint(
+                project_id, {"partial_state": state.to_dict(), "abort_reason": "TIMEOUT"}
+            )
+            return state.to_dict()
+        except BudgetExceeded as exc:
+            emit("error", f"Workflow aborted: {exc}", {})
+            state.structured_result = self._build_completion(state)
+            state.structured_result["status"] = "budget_exceeded"
+            state.structured_result["abort_reason"] = "ITERATION_BUDGET_EXCEEDED"
+            return state.to_dict()
+
         state.structured_result = self._build_completion(state)
         state.final_result = state.structured_result.get("summary", "")
         try:
@@ -476,6 +505,10 @@ class WorkflowOrchestrator:
             retries += 1
 
     def _run_agent(self, name: str, state: WorkflowState, emit: Callable[[str, str, Dict[str, Any]], None]) -> None:
+        # Issue 1: enforce iteration budget + wall-clock deadline before every agent run.
+        self.guardrails.budget.tick(name)
+        self.guardrails.timeout.touch()
+
         label = self._agent_label(name)
         context = state.agent_context.get(label, {})
         

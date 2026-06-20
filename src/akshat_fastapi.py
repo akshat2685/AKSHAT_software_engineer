@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.api.routes import get_current_user, router as auth_router
+from backend.app.utils.safeguards import WorkflowGuardrails
 
 try:
     from akshat_local import AkshatCore, EventBus, MemoryStore, DB_PATH, HOST, PORT
@@ -33,6 +34,23 @@ SRC = Path(__file__).resolve().parent
 memory = MemoryStore(DB_PATH)
 bus = EventBus()
 core = AkshatCore(memory, bus)
+
+# Issue 1: per-IP workflow rate limiter (in-process; swap for Redis in prod).
+_workflow_guardrails = WorkflowGuardrails.from_settings()
+
+
+def _check_workflow_rate_limit(request: Request) -> None:
+    """Throttle expensive workflow submissions per client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = _workflow_guardrails.limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Workflow rate limit exceeded. Max {_workflow_guardrails.limiter.max_requests} "
+                   f"per {_workflow_guardrails.limiter.window_seconds}s. Try again later.",
+            headers={"Retry-After": str(_workflow_guardrails.limiter.window_seconds)},
+        )
+
 
 app = FastAPI(title="AKSHAT Autonomous Engineering OS")
 app.include_router(auth_router)
@@ -100,21 +118,27 @@ def tools(current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
 
 
 @app.post("/api/task")
-def submit_task(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+def submit_task(payload: Dict[str, Any], request: Request, current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    _check_workflow_rate_limit(request)
     try:
         user_id = current_user.get("user_id", 1)
         workflow_pattern = str(payload.get("workflow_pattern", "Auto"))
         return core.submit(str(payload.get("prompt", "")), user_id=user_id, workflow_pattern=workflow_pattern)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/chat")
-def chat(payload: Dict[str, Any], current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+def chat(payload: Dict[str, Any], request: Request, current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    _check_workflow_rate_limit(request)
     try:
         user_id = current_user.get("user_id", 1)
         workflow_pattern = str(payload.get("workflow_pattern", "Auto"))
         return core.chat(str(payload.get("message", "")), user_id=user_id, workflow_pattern=workflow_pattern)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

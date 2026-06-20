@@ -7,6 +7,9 @@ node_modules/
 .env
 .env.*
 akshat_memory.sqlite3
+*.sqlite3
+akshat.db
+*.db
 *.log
 workspace/
 AIEngineerWorkspace/
@@ -15,3 +18,4 @@ src/assets/projects/
 frontend/dist/
 frontend/node_modules/
 chroma_db/
+logs/

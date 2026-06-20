@@ -55,6 +55,29 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = Field(default=True)
     RATE_LIMIT_REQUESTS: int = Field(default=100)
     RATE_LIMIT_PERIOD: int = Field(default=60)  # seconds
+
+    # Workflow Safeguards — hard limits to prevent infinite loops & runaway cost
+    WORKFLOW_MAX_ITERATIONS: int = Field(default=50)
+    WORKFLOW_TIMEOUT_SECONDS: int = Field(default=300)
+    WORKFLOW_RATE_LIMIT: int = Field(default=50)        # workflows per window
+    WORKFLOW_RATE_WINDOW: int = Field(default=3600)     # window in seconds
+
+    # Sandbox (Issue 4)
+    SANDBOX_ENABLED: bool = Field(default=True)
+    SANDBOX_IMAGE: str = Field(default="python:3.12-slim")
+    SANDBOX_MEMORY: str = Field(default="512m")
+    SANDBOX_CPUS: str = Field(default="1.0")
+    SANDBOX_TIMEOUT_SECONDS: int = Field(default=30)
+    SANDBOX_PIDS_LIMIT: int = Field(default=100)
+
+    # Observability (Issue 5)
+    LANGSMITH_ENABLED: bool = Field(default=False)
+    LANGSMITH_API_KEY: Optional[str] = Field(default=None)
+    LANGSMITH_PROJECT: str = Field(default="akshat")
+
+    # Prompt security (Issue 6)
+    PROMPT_INJECTION_BLOCK_THRESHOLD: float = Field(default=0.8)
+    PROMPT_INJECTION_FLAG_THRESHOLD: float = Field(default=0.5)
     
     # Logging
     LOG_LEVEL: str = Field(default="INFO")

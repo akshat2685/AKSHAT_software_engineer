@@ -145,3 +145,24 @@ class SystemSettings(Base):
     setting_key = Column(String(100), unique=True, nullable=False)
     setting_value = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class AgentMemory(Base):
+    """Production-grade agent memory (Issue 3).
+
+    Concurrent-safe alternative to the SQLite-only ``memories`` table. On
+    PostgreSQL the ``content`` column is JSONB and ``embedding`` is a
+    pgvector VECTOR(1536) (see migration a1b2c3d4e5f6); on SQLite both are
+    stored as TEXT/JSON so the model works in local dev too.
+    """
+    __tablename__ = "agent_memories"
+
+    id = Column(String(36), primary_key=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    agent_type = Column(String(50), nullable=False)
+    memory_type = Column(String(50), nullable=False)  # short_term | long_term | episodic
+    content = Column(Text, nullable=False)            # JSON string (JSONB on PG)
+    embedding = Column(Text, nullable=True)           # JSON list (VECTOR on PG)
+    access_count = Column(Integer, default=0)
+    last_accessed = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now)

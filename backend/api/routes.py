@@ -4,11 +4,14 @@ import hashlib
 import json
 import time
 import os
+import uuid
 import bcrypt
 from typing import Dict, Any, List
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Header, HTTPException, Depends, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from jose import JWTError, jwt as jose_jwt
 from backend.database.connection import get_db
 from backend.database.models import User, Project, Event
 from supabase import create_client, Client
@@ -26,42 +29,127 @@ def get_supabase() -> Client | None:
             return None
     return None
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "akshat_v2_super_secret_key_123456")
+# ---------------------------------------------------------------------------
+# JWT configuration (Issue 2 — replaced custom HMAC JWT with python-jose)
+#
+# Security properties of the new implementation:
+#   • Algorithm is PINNED to HS256 on both encode and decode. This blocks the
+#     classic "alg: none" and algorithm-confusion attacks that custom JWT
+#     implementations are vulnerable to.
+#   • Each token carries a `type` claim ("access" | "refresh") so an access
+#     token cannot be replayed as a refresh token and vice-versa.
+#   • Each token carries a unique `jti` (JWT ID) so individual tokens can be
+#     revoked via a denylist (see revoke_token / is_revoked below).
+#   • `exp` and `iat` are standard numeric-datetime claims, validated by jose.
+# ---------------------------------------------------------------------------
+
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    raise RuntimeError(
+        "JWT_SECRET must be set and at least 32 characters. "
+        "Refusing to start with a weak/default secret."
+    )
 JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_TTL = timedelta(minutes=30)
+REFRESH_TOKEN_TTL = timedelta(days=7)
 
-# JWT Utilities
-def base64url_encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+# In-process token revocation list (jti). For multi-process deploys, back this
+# with Redis with a TTL matching the token expiry.
+_REVOKED_JTI: set[str] = set()
 
-def base64url_decode(data: str) -> bytes:
-    padding = '=' * (4 - (len(data) % 4))
-    return base64.urlsafe_b64decode(data + padding)
 
-def create_jwt_token(payload: dict) -> str:
-    header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
-    header_json = json.dumps(header, separators=(',', ':')).encode('utf-8')
-    payload_json = json.dumps(payload, separators=(',', ':')).encode('utf-8')
-    
-    unsigned_token = base64url_encode(header_json) + "." + base64url_encode(payload_json)
-    signature = hmac.new(JWT_SECRET.encode('utf-8'), unsigned_token.encode('utf-8'), hashlib.sha256).digest()
-    return unsigned_token + "." + base64url_encode(signature)
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
-def decode_jwt_token(token: str) -> dict | None:
+
+def _build_payload(user_id: Any, email: str, token_type: str, ttl: timedelta) -> dict:
+    """Construct a hardened JWT payload with type, iat, exp, and jti claims."""
+    issued_at = _now()
+    return {
+        "user_id": user_id,
+        "email": email,
+        "type": token_type,
+        "iat": int(issued_at.timestamp()),
+        "exp": int((issued_at + ttl).timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+
+
+def create_jwt_token(payload: dict, token_type: str = "access") -> str:
+    """Create a signed JWT.
+
+    Backwards-compatible with the old call signature ``create_jwt_token(dict)``:
+    if no ``token_type`` is supplied and the caller already embedded an ``exp``,
+    we honour a raw pass-through for any legacy callers, while still signing via
+    jose with a pinned algorithm. Prefer :func:`create_access_token` / 
+    :func:`create_refresh_token` for new code.
+    """
+    # Legacy path: caller passed a fully-formed dict (e.g. {"exp": ..., "user_id": ...})
+    if "type" not in payload:
+        payload = {**payload, "type": token_type}
+    if "iat" not in payload:
+        payload["iat"] = int(_now().timestamp())
+    if "jti" not in payload:
+        payload["jti"] = str(uuid.uuid4())
+    # jose tolerates both numeric and datetime exp; normalise to int.
+    exp = payload.get("exp")
+    if isinstance(exp, (int, float)):
+        payload["exp"] = int(exp)
+    return jose_jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def create_access_token(user_id: Any, email: str) -> str:
+    return create_jwt_token(_build_payload(user_id, email, "access", ACCESS_TOKEN_TTL))
+
+
+def create_refresh_token(user_id: Any, email: str) -> str:
+    return create_jwt_token(_build_payload(user_id, email, "refresh", REFRESH_TOKEN_TTL))
+
+
+def decode_jwt_token(token: str, expected_type: str | None = None) -> dict | None:
+    """Verify and decode a JWT.
+
+    Returns the payload dict on success, or ``None`` if the signature is
+    invalid, the token has expired, the algorithm was tampered with, or the
+    (optional) ``expected_type`` does not match the token's ``type`` claim.
+    """
     try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
-        unsigned_token = parts[0] + "." + parts[1]
-        signature = base64url_decode(parts[2])
-        expected_sig = hmac.new(JWT_SECRET.encode('utf-8'), unsigned_token.encode('utf-8'), hashlib.sha256).digest()
-        if not hmac.compare_digest(signature, expected_sig):
-            return None
-        payload_data = json.loads(base64url_decode(parts[1]).decode('utf-8'))
-        if "exp" in payload_data and payload_data["exp"] < time.time():
-            return None
-        return payload_data
-    except Exception:
+        # algorithms=[...] is mandatory: jose will refuse to decode if the token
+        # header specifies any algorithm not in this list. This is what defeats
+        # the "alg: none" / key-confusion attacks.
+        payload = jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except JWTError:
         return None
+
+    if expected_type and payload.get("type") != expected_type:
+        return None
+
+    # Honour revocation list (logout).
+    jti = payload.get("jti")
+    if jti and jti in _REVOKED_JTI:
+        return None
+
+    return payload
+
+
+def revoke_token(token: str) -> bool:
+    """Add a token's jti to the revocation list. Returns True if revoked."""
+    payload = decode_jwt_token(token)
+    if not payload:
+        return False
+    jti = payload.get("jti")
+    if jti:
+        _REVOKED_JTI.add(jti)
+        return True
+    return False
+
+
+def is_token_revoked(token: str) -> bool:
+    payload = decode_jwt_token(token)
+    if not payload:
+        return True
+    return payload.get("jti") in _REVOKED_JTI
+
 
 # Password Utilities
 def hash_password(password: str) -> str:
@@ -149,7 +237,11 @@ def login(payload: AuthRequest, db: Session = Depends(get_db)):
     return {"token": token, "email": user.email, "user_id": user.id}
 
 @router.post("/auth/logout")
-def logout():
+def logout(authorization: str = Header(None)):
+    """Revoke the caller's access token so it cannot be reused after logout."""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        revoke_token(token)
     return {"ok": True}
 
 @router.get("/api/projects")
